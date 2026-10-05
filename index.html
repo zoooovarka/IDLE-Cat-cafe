@@ -1,0 +1,2136 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#fdf3e7">
+<title>Котокафе</title>
+<!-- Яндекс Игры SDK. При локальном запуске файла нет — игра переключится на заглушки -->
+<script src="/sdk.js"></script>
+<style>
+/* ===================== ПАЛИТРА ===================== */
+:root {
+  --bg: #fdf3e7;
+  --panel: #fff8ef;
+  --card: #ffffff;
+  --ink: #4a2f1d;
+  --muted: #9a7b62;
+  --line: #f0dcc4;
+  --accent: #ff8c42;
+  --accent-dark: #e0702a;
+  --ad: #7b5cff;
+  --ad-dark: #5f43d9;
+  --good: #3fae5a;
+  --common: #6fb35a;
+  --rare: #3f8fe0;
+  --legendary: #f0a500;
+  --u: 4px;              /* единица масштаба зала, пересчитывается из JS */
+  --wall1: #ffe9d2; --wall2: #ffd9b3;
+  --floor1: #c98b5a; --floor2: #b67747;
+  --sky1: #9fd8ff; --sky2: #dff3ff;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body {
+  margin: 0; height: 100%; overflow: hidden;
+  background: var(--bg); color: var(--ink);
+  font-family: "Trebuchet MS", "Segoe UI", Roboto, Arial, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  font-size: 14px;
+  -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+  overscroll-behavior: none;
+}
+button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; padding: 0; }
+img { -webkit-user-drag: none; user-select: none; }
+/* Эмодзи-графика: цветные шрифты эмодзи в приоритете */
+.ic, .emo, .ti, .ricon, .gi, .di, .m-icon, .fx-cup, .fx-heart, .iconbtn, .window, .shelf, .m-cup, .m-logo {
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Segoe UI Symbol", sans-serif;
+}
+
+/* ===================== КАРКАС ===================== */
+#app {
+  position: fixed; inset: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) minmax(0, 46%);
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "top" "hall" "panel";
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+/* Горизонтальная ориентация и компьютер: зал слева, панель справа */
+@media (orientation: landscape) and (min-aspect-ratio: 5/4) {
+  #app {
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 40%);
+    grid-template-areas: "top top" "hall panel";
+  }
+}
+@media (orientation: landscape) and (min-aspect-ratio: 5/4) and (min-width: 1100px) {
+  #app { grid-template-columns: minmax(0, 1fr) 440px; }
+  html, body { font-size: 15px; }
+}
+
+/* ===================== ВЕРХНЯЯ ПАНЕЛЬ ===================== */
+#top {
+  grid-area: top;
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px;
+  background: linear-gradient(#fff6ea, #ffeedb);
+  border-bottom: 2px solid var(--line);
+  z-index: 10;
+}
+.balance { flex: 1; min-width: 0; }
+.coins { display: flex; align-items: center; gap: 6px; font-size: 1.75em; font-weight: 800; line-height: 1.1; white-space: nowrap; }
+.coins .ico { font-size: .85em; }
+.cps { color: var(--muted); font-weight: 700; font-size: .95em; white-space: nowrap; }
+.cps.boosted { color: var(--accent-dark); }
+.chip {
+  display: flex; align-items: center; gap: 4px;
+  padding: 6px 10px; border-radius: 999px;
+  background: #fff; border: 2px solid var(--line);
+  font-weight: 800; white-space: nowrap;
+}
+.chip.glow { border-color: var(--legendary); box-shadow: 0 0 0 3px rgba(240,165,0,.25); animation: pulse 1.4s infinite; }
+.iconbtn { width: 38px; height: 38px; border-radius: 50%; background: #fff; border: 2px solid var(--line); font-size: 18px; }
+
+/* ===================== ЗАЛ КАФЕ ===================== */
+#hall { grid-area: hall; position: relative; overflow: hidden; transition: filter .6s; }
+#hall.moving { filter: brightness(1.6) saturate(.4); }
+.wall {
+  position: absolute; left: 0; right: 0; top: 0; height: 47%;
+  background: linear-gradient(var(--wall1), var(--wall2));
+  background-size: cover; background-position: center;
+}
+.wall::before { /* обои в горошек */
+  content: ""; position: absolute; inset: 0; opacity: .35;
+  background-image: radial-gradient(rgba(255,255,255,.9) 18%, transparent 20%);
+  background-size: calc(var(--u) * 6) calc(var(--u) * 6);
+}
+.wall::after { /* плинтус */
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: calc(var(--u) * 1.6);
+  background: rgba(110, 68, 38, .35);
+}
+.floor {
+  position: absolute; left: 0; right: 0; top: 47%; bottom: 0;
+  background: repeating-conic-gradient(var(--floor1) 0 25%, var(--floor2) 0 50%) 0 0 / calc(var(--u) * 10) calc(var(--u) * 10);
+}
+.floor::after { content: ""; position: absolute; inset: 0; background: linear-gradient(rgba(0,0,0,.18), transparent 40%); }
+.window {
+  position: absolute; left: 5%; top: 12%;
+  width: calc(var(--u) * 21); height: calc(var(--u) * 17);
+  border: calc(var(--u) * 1.2) solid #fff; border-radius: calc(var(--u) * 2);
+  background: linear-gradient(var(--sky1), var(--sky2));
+  box-shadow: 0 3px 0 rgba(0,0,0,.12);
+  display: flex; align-items: flex-end; justify-content: center;
+  font-size: calc(var(--u) * 9); overflow: hidden;
+}
+.window::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: calc(var(--u) * .8); background: #fff; transform: translateX(-50%); }
+.window > span { position: relative; z-index: 1; margin-bottom: calc(var(--u) * .5); }
+.sign {
+  position: absolute; left: 50%; top: 3%; transform: translateX(-50%);
+  background: linear-gradient(#a8693d, #8b532c); color: #fff3df;
+  padding: calc(var(--u) * 1) calc(var(--u) * 3.5); border-radius: calc(var(--u) * 2);
+  box-shadow: 0 3px 0 #6b3d1f; text-align: center; white-space: nowrap;
+  font-size: clamp(11px, calc(var(--u) * 3.6), 22px); line-height: 1.15; z-index: 2;
+}
+.sign b { display: block; font-size: 1.15em; letter-spacing: .5px; }
+.sign span { opacity: .85; font-size: .85em; }
+.shelf {
+  position: absolute; right: 5%; top: 22%;
+  width: calc(var(--u) * 24); height: calc(var(--u) * 10);
+  border-bottom: calc(var(--u) * 1.4) solid #9b6238;
+  display: flex; align-items: flex-end; justify-content: space-around;
+  font-size: calc(var(--u) * 6);
+}
+.lamp { position: absolute; top: 0; width: 2px; height: 10%; background: #6b4a33; }
+.lamp::after {
+  content: ""; position: absolute; left: 50%; bottom: calc(var(--u) * -3); transform: translateX(-50%);
+  width: calc(var(--u) * 6); height: calc(var(--u) * 3.4); border-radius: 50% 50% 10% 10%;
+  background: #ffcf6e; box-shadow: 0 calc(var(--u) * 2) calc(var(--u) * 6) rgba(255,207,110,.8);
+}
+.lamp.l1 { left: 30%; } .lamp.l2 { left: 70%; }
+.counter {
+  position: absolute; left: 24%; right: 24%; bottom: 26%; height: 12%;
+  background: linear-gradient(#bf8150, #8d5a34);
+  border-radius: calc(var(--u) * 2) calc(var(--u) * 2) calc(var(--u) * .8) calc(var(--u) * .8);
+  box-shadow: 0 calc(var(--u) * 1.2) 0 #6e4426, inset 0 calc(var(--u) * .8) 0 rgba(255,255,255,.25);
+  z-index: 60;
+}
+
+/* --- Кофемашина (главный объект для тапа) --- */
+#machine {
+  position: absolute; left: 50%; bottom: 35%;
+  width: calc(var(--u) * 30); height: calc(var(--u) * 37);
+  transform: translateX(-50%); transform-origin: 50% 100%;
+  z-index: 70; cursor: pointer; touch-action: none;
+}
+#machine img { width: 100%; height: 100%; object-fit: contain; }
+.m-top {
+  position: absolute; left: 8%; right: 8%; top: 0; height: 15%;
+  background: linear-gradient(#ffffff, #b8b8b8);
+  border-radius: 45% 45% 12% 12% / 70% 70% 12% 12%;
+  box-shadow: inset 0 -3px 0 rgba(0,0,0,.15);
+}
+.m-body {
+  position: absolute; left: 0; right: 0; top: 13%; height: 57%;
+  background: linear-gradient(135deg, #ee6650, #b83a2b);
+  border-radius: 14% 14% 8% 8%;
+  box-shadow: inset calc(var(--u) * -1.5) calc(var(--u) * -1.5) 0 rgba(0,0,0,.12), 0 calc(var(--u) * 1) 0 #8a2a1f;
+}
+.m-panel {
+  position: absolute; left: 14%; right: 14%; top: 12%; height: 30%;
+  background: #2f2a28; border-radius: calc(var(--u) * 2);
+  display: flex; align-items: center; justify-content: space-around;
+}
+.m-light { width: 16%; aspect-ratio: 1; border-radius: 50%; background: #7cfc00; box-shadow: 0 0 6px #7cfc00; }
+.m-light.b { background: #ffd23f; box-shadow: 0 0 6px #ffd23f; animation: blink 1.6s infinite; }
+.m-logo { position: absolute; left: 50%; bottom: 8%; transform: translateX(-50%); font-size: calc(var(--u) * 7); opacity: .9; }
+.m-nozzle { position: absolute; left: 41%; width: 18%; top: 70%; height: 7%; background: #4d4d4d; border-radius: 0 0 calc(var(--u)) calc(var(--u)); }
+.m-base { position: absolute; left: -5%; right: -5%; bottom: 0; height: 8%; background: linear-gradient(#e6e6e6, #9a9a9a); border-radius: calc(var(--u) * 1.6); }
+.m-cup { position: absolute; left: 50%; bottom: 6%; transform: translateX(-50%); font-size: calc(var(--u) * 9); line-height: 1; }
+.steam { position: absolute; bottom: 20%; width: calc(var(--u) * 1.4); height: calc(var(--u) * 6); border-radius: 50%; background: rgba(255,255,255,.75); filter: blur(1px); opacity: 0; animation: steam 2.4s infinite; }
+.steam.s1 { left: 44%; } .steam.s2 { left: 54%; animation-delay: 1.2s; }
+
+/* --- Коты в зале --- */
+#cats { position: absolute; inset: 0; pointer-events: none; }
+.cat {
+  position: absolute; transform: translate(-50%, -100%) scale(var(--s, 1));
+  font-size: calc(var(--u) * 10); line-height: 1; pointer-events: auto; cursor: pointer;
+}
+.cat .body { display: block; transform-origin: 50% 100%; }
+.cat.a1 .body { animation: bob 1.8s ease-in-out infinite; }
+.cat.a2 .body { animation: sway 2.6s ease-in-out infinite; }
+.cat.a3 .body { animation: walk 7s ease-in-out infinite; }
+.cat .shadow { position: absolute; left: 10%; right: 10%; bottom: -6%; height: 14%; border-radius: 50%; background: rgba(0,0,0,.2); z-index: -1; }
+.cat.pop .body { animation: pop .5s ease-out; }
+
+/* --- Иконки: эмодзи + значок (легко заменить на картинку) --- */
+.ic { position: relative; display: inline-block; line-height: 1; }
+.ic .emo { display: block; }
+.ic img.emo { width: 1em; height: 1em; object-fit: contain; }
+.ic .bdg { position: absolute; right: -22%; bottom: -10%; font-size: .52em; }
+.ic img.bdg { width: .52em; height: .52em; object-fit: contain; }
+.sil { filter: brightness(0); opacity: .35; }
+
+/* --- Редкий гость --- */
+#guestLayer { position: absolute; inset: 0; pointer-events: none; z-index: 200; }
+.guest {
+  position: absolute; transform: translate(-50%, -100%);
+  font-size: calc(var(--u) * 13); line-height: 1; pointer-events: auto; cursor: pointer;
+  animation: guestIn .5s ease-out;
+}
+.guest .body { display: block; animation: bob 1s ease-in-out infinite; }
+.guest::before {
+  content: ""; position: absolute; left: 50%; top: 55%; width: 150%; aspect-ratio: 1;
+  transform: translate(-50%, -50%); border-radius: 50%;
+  background: radial-gradient(rgba(255,255,255,.95), rgba(255,255,255,0) 65%);
+  animation: glow 1s infinite; z-index: -1;
+}
+.guest.rare::before { background: radial-gradient(rgba(120,180,255,.95), rgba(120,180,255,0) 65%); }
+.guest.legendary::before { background: radial-gradient(rgba(255,210,80,1), rgba(255,210,80,0) 65%); }
+.guest .spark { position: absolute; top: -20%; right: -20%; font-size: .4em; animation: spin 2s linear infinite; }
+.guest .gtime { position: absolute; left: 50%; top: -24%; transform: translateX(-50%); font-size: .22em; font-weight: 800; background: #fff; border-radius: 999px; padding: 1px 6px; box-shadow: 0 1px 3px rgba(0,0,0,.2); white-space: nowrap; }
+.guest.leave { animation: guestOut .4s ease-in forwards; }
+
+/* --- Эффекты тапа --- */
+#fx { position: absolute; inset: 0; pointer-events: none; z-index: 300; overflow: hidden; }
+.fx-num {
+  position: absolute; transform: translate(-50%, -50%);
+  font-weight: 900; font-size: clamp(16px, calc(var(--u) * 5), 30px); color: #fff;
+  text-shadow: 0 2px 0 #b8551b, 0 0 6px rgba(0,0,0,.25);
+  animation: floatUp .9s ease-out forwards; white-space: nowrap;
+}
+.fx-cup { position: absolute; font-size: calc(var(--u) * 7); transform: translate(-50%, -50%); animation: cupFly .9s ease-out forwards; }
+.fx-heart { position: absolute; transform: translate(-50%, -50%); font-size: calc(var(--u) * 5); animation: floatUp 1s ease-out forwards; }
+
+/* --- Индикаторы бустов, кнопки зала, уведомления --- */
+#boosts { position: absolute; left: 8px; top: 8px; display: flex; flex-direction: column; gap: 6px; z-index: 250; }
+.boost { background: rgba(255,255,255,.92); border-radius: 999px; padding: 4px 10px; font-weight: 800; font-size: .9em; box-shadow: 0 2px 6px rgba(0,0,0,.15); white-space: nowrap; }
+.boost.frenzy { background: #fff3c4; color: #a25b00; animation: pulse 1s infinite; }
+.hallbtn {
+  position: absolute; bottom: 8px; z-index: 250;
+  padding: 7px 12px; border-radius: 999px;
+  background: var(--ad); color: #fff; font-weight: 800; font-size: .92em;
+  box-shadow: 0 3px 0 var(--ad-dark), 0 4px 10px rgba(0,0,0,.2);
+  white-space: nowrap; max-width: 48%; overflow: hidden; text-overflow: ellipsis;
+}
+.hallbtn.left { left: 8px; } .hallbtn.right { right: 8px; }
+.hallbtn:disabled { background: #b9aed8; box-shadow: 0 3px 0 #9a8fbb; cursor: default; }
+.hallbtn.active:disabled { background: var(--accent); box-shadow: 0 3px 0 var(--accent-dark); }
+.hallbtn:not(:disabled):active { transform: translateY(2px); box-shadow: 0 1px 0 var(--ad-dark); }
+#toasts { position: absolute; left: 50%; bottom: 52px; transform: translateX(-50%); width: min(92%, 420px); display: flex; flex-direction: column; align-items: center; gap: 6px; z-index: 400; pointer-events: none; }
+.toast {
+  background: rgba(74, 47, 29, .92); color: #fff; border-radius: 14px;
+  padding: 8px 14px; font-weight: 700; text-align: center;
+  box-shadow: 0 4px 12px rgba(0,0,0,.25); animation: toastIn .3s ease-out;
+}
+.toast.gold { background: linear-gradient(135deg, #f7b500, #e07b00); }
+.toast.blue { background: linear-gradient(135deg, #4c9bea, #6a5cff); }
+.toast.out { animation: toastOut .4s ease-in forwards; }
+
+/* ===================== НИЖНЯЯ ПАНЕЛЬ ===================== */
+#panel {
+  grid-area: panel; display: flex; flex-direction: column; min-height: 0;
+  background: var(--panel); border-top: 2px solid var(--line);
+}
+@media (orientation: landscape) and (min-aspect-ratio: 5/4) {
+  #panel { border-top: 0; border-left: 2px solid var(--line); }
+}
+#panelBody { flex: 1; min-height: 0; position: relative; }
+.tab-page {
+  position: absolute; inset: 0; overflow-y: auto; overflow-x: hidden;
+  padding: 8px 8px 12px; display: none;
+  overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+}
+.tab-page.active { display: block; }
+#tabs { display: flex; border-top: 2px solid var(--line); background: #fff4e4; padding-bottom: env(safe-area-inset-bottom); }
+#tabs button {
+  flex: 1; position: relative; padding: 6px 2px 5px;
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  font-weight: 700; font-size: .82em; color: var(--muted);
+}
+#tabs button .ti { font-size: 1.55em; line-height: 1.1; }
+#tabs button.active { color: var(--ink); background: var(--panel); box-shadow: inset 0 3px 0 var(--accent); }
+#tabs .dot { position: absolute; top: 4px; right: calc(50% - 22px); min-width: 10px; height: 10px; border-radius: 999px; background: #ff4d4d; display: none; }
+#tabs .dot.on { display: block; }
+
+/* Списки */
+.seg { display: flex; gap: 6px; margin-bottom: 8px; }
+.seg button { flex: 1; padding: 7px 0; border-radius: 10px; background: #fff; border: 2px solid var(--line); font-weight: 800; }
+.seg button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.list { display: flex; flex-direction: column; gap: 6px; }
+.row {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--card); border-radius: 14px; padding: 8px 10px;
+  box-shadow: 0 2px 0 var(--line);
+}
+.row .ricon { width: 46px; flex: 0 0 46px; text-align: center; font-size: 34px; }
+.row .rinfo { flex: 1; min-width: 0; }
+.row .rname { font-weight: 800; line-height: 1.2; }
+.row .rname .cnt { color: var(--accent-dark); margin-left: 4px; }
+.row .rsub { color: var(--muted); font-size: .88em; line-height: 1.25; margin-top: 2px; }
+.row.locked { opacity: .7; }
+.buy {
+  flex: 0 0 auto; min-width: 86px; padding: 6px 10px; border-radius: 12px;
+  background: var(--accent); color: #fff; font-weight: 800; line-height: 1.15;
+  box-shadow: 0 3px 0 var(--accent-dark); text-align: center;
+}
+.buy small { display: block; font-size: .78em; opacity: .9; }
+.buy:disabled { background: #d9c8b6; box-shadow: 0 3px 0 #bfa992; cursor: default; }
+.buy:not(:disabled):active { transform: translateY(2px); box-shadow: 0 1px 0 var(--accent-dark); }
+.hint { color: var(--muted); text-align: center; padding: 10px; font-size: .9em; }
+
+/* Престиж */
+.prestige {
+  background: linear-gradient(135deg, #fff1c9, #ffe0b0);
+  border: 2px solid #f3c56b; border-radius: 16px; padding: 10px 12px; margin-bottom: 10px;
+}
+.prestige h3 { margin: 0 0 4px; font-size: 1.05em; }
+.prestige .pline { font-size: .9em; margin: 2px 0; }
+.prestige .pgain { font-weight: 800; color: #a25b00; }
+.prestige .buy { width: 100%; margin-top: 8px; padding: 9px; background: linear-gradient(135deg, #f7b500, #e07b00); box-shadow: 0 3px 0 #b05f00; }
+.prestige .buy:disabled { background: #e2cfa7; box-shadow: 0 3px 0 #c9b083; }
+.sec-title { font-weight: 800; color: var(--muted); font-size: .85em; text-transform: uppercase; letter-spacing: .5px; margin: 8px 2px 6px; }
+
+/* Коллекция */
+.col-head { background: #fff; border-radius: 14px; padding: 8px 12px; margin-bottom: 8px; font-weight: 800; box-shadow: 0 2px 0 var(--line); text-align: center; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); gap: 6px; }
+.gcard {
+  background: #fff; border-radius: 14px; padding: 8px 4px 6px; text-align: center;
+  border: 2px solid var(--line); position: relative;
+}
+.gcard .gi { font-size: 36px; height: 44px; display: flex; align-items: center; justify-content: center; }
+.gcard .gn { font-size: .78em; font-weight: 700; line-height: 1.15; min-height: 2.3em; display: flex; align-items: center; justify-content: center; }
+.gcard .gc { font-size: .72em; color: var(--muted); }
+.gcard.common { border-color: var(--common); }
+.gcard.rare { border-color: var(--rare); background: #f2f8ff; }
+.gcard.legendary { border-color: var(--legendary); background: #fffaea; }
+.gcard.unknown { border-style: dashed; background: #faf5ef; }
+.rar-common { color: var(--common); } .rar-rare { color: var(--rare); } .rar-legendary { color: var(--legendary); }
+
+/* Достижения */
+.ach .ricon { font-size: 30px; }
+.ach.locked .ricon { filter: grayscale(1); opacity: .5; }
+.ach.done { background: #f3fff2; box-shadow: 0 2px 0 #cfe9c9; }
+.bar { height: 6px; border-radius: 999px; background: #f1e4d4; margin-top: 4px; overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+.ach .rew { flex: 0 0 auto; font-weight: 800; font-size: .85em; text-align: right; color: var(--accent-dark); }
+.ach.done .rew { color: var(--good); }
+
+/* ===================== ОКНА ===================== */
+.overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(60, 35, 20, .55);
+  display: none; align-items: center; justify-content: center; padding: 16px;
+}
+.overlay.show { display: flex; }
+.mcard {
+  width: min(100%, 400px); max-height: 100%; overflow-y: auto;
+  background: var(--panel); border-radius: 22px; padding: 16px;
+  box-shadow: 0 10px 40px rgba(0,0,0,.35); text-align: center;
+  animation: popIn .25s ease-out;
+}
+.mcard .m-icon { font-size: 52px; line-height: 1.1; }
+.mcard h2 { margin: 4px 0 8px; font-size: 1.3em; }
+.mcard p { margin: 6px 0; line-height: 1.35; }
+.mcard .big-amount { font-size: 1.8em; font-weight: 900; margin: 8px 0; color: var(--accent-dark); }
+.m-btns { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.btn { padding: 11px; border-radius: 14px; font-weight: 800; background: #fff; border: 2px solid var(--line); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 3px 0 var(--accent-dark); }
+.btn.ad { background: var(--ad); border-color: var(--ad); color: #fff; box-shadow: 0 3px 0 var(--ad-dark); }
+.btn:active { transform: translateY(2px); }
+.daily { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px; }
+.dcell { background: #fff; border: 2px solid var(--line); border-radius: 12px; padding: 6px 2px; font-size: .8em; }
+.dcell .di { font-size: 22px; }
+.dcell .da { font-weight: 800; }
+.dcell .dg { color: var(--rare); font-weight: 800; font-size: .9em; }
+.dcell.done { opacity: .55; }
+.dcell.done .di::after { content: " ✔"; font-size: 14px; color: var(--good); }
+.dcell.today { border-color: var(--accent); background: #fff2e3; box-shadow: 0 0 0 3px rgba(255,140,66,.25); }
+.dcell:nth-child(7) { grid-column: span 2; }
+#adStub .mcard { background: #222; color: #fff; }
+
+/* ===================== АНИМАЦИИ ===================== */
+@keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8%); } }
+@keyframes sway { 0%,100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg); } }
+@keyframes walk {
+  0% { transform: translateX(0) scaleX(1); } 45% { transform: translateX(60%) scaleX(1); }
+  50% { transform: translateX(60%) scaleX(-1); } 95% { transform: translateX(-30%) scaleX(-1); }
+  100% { transform: translateX(0) scaleX(1); }
+}
+@keyframes pop { 0% { transform: scale(0); } 70% { transform: scale(1.25); } 100% { transform: scale(1); } }
+@keyframes popIn { from { transform: scale(.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes floatUp { from { opacity: 1; margin-top: 0; } to { opacity: 0; margin-top: calc(var(--u) * -18); } }
+@keyframes cupFly {
+  0% { opacity: 1; transform: translate(-50%, -50%) scale(.6) rotate(0); }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1) rotate(var(--rot)); }
+}
+@keyframes steam { 0% { opacity: 0; transform: translateY(0) scaleX(1); } 30% { opacity: .8; } 100% { opacity: 0; transform: translateY(-120%) scaleX(1.8); } }
+@keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+@keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+@keyframes glow { 0%,100% { opacity: .7; transform: translate(-50%,-50%) scale(.9); } 50% { opacity: 1; transform: translate(-50%,-50%) scale(1.1); } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes guestIn { from { opacity: 0; transform: translate(-50%, -60%) scale(.3); } to { opacity: 1; transform: translate(-50%, -100%) scale(1); } }
+@keyframes guestOut { to { opacity: 0; transform: translate(-50%, -140%) scale(.4); } }
+@keyframes toastIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
+@keyframes toastOut { to { opacity: 0; transform: translateY(-10px); } }
+@media (prefers-reduced-motion: reduce) {
+  .cat .body, .guest .body, .steam { animation: none !important; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="top">
+    <div class="balance">
+      <div class="coins"><span class="ico" id="coinIco">🪙</span><span id="coins">0</span></div>
+      <div class="cps" id="cps">0/с</div>
+    </div>
+    <button class="chip" id="starsChip"><span id="starIco">⭐</span><span id="stars">0</span></button>
+    <button class="iconbtn" id="soundBtn" aria-label="sound">🔊</button>
+  </header>
+
+  <main id="hall">
+    <div class="wall">
+      <div class="window"><span id="cityIcon"></span></div>
+      <div class="shelf" id="shelf"></div>
+      <div class="lamp l1"></div><div class="lamp l2"></div>
+    </div>
+    <div class="sign"><b id="signTitle"></b><span id="signCity"></span></div>
+    <div class="floor"></div>
+    <div class="counter"></div>
+    <div id="machine" role="button"></div>
+    <div id="cats"></div>
+    <div id="guestLayer"></div>
+    <div id="fx"></div>
+    <div id="boosts"></div>
+    <div id="toasts"></div>
+    <button class="hallbtn left" id="rushBtn"></button>
+    <button class="hallbtn right" id="guestBtn"></button>
+  </main>
+
+  <section id="panel">
+    <div id="panelBody">
+      <div class="tab-page" id="page-cats"></div>
+      <div class="tab-page" id="page-upgrades"></div>
+      <div class="tab-page" id="page-collection"></div>
+      <div class="tab-page" id="page-achievements"></div>
+    </div>
+    <nav id="tabs">
+      <button data-tab="cats"><span class="ti">🐱</span><span data-i18n="tabCats"></span><i class="dot"></i></button>
+      <button data-tab="upgrades"><span class="ti">⚡</span><span data-i18n="tabUpgrades"></span><i class="dot"></i></button>
+      <button data-tab="collection"><span class="ti">📖</span><span data-i18n="tabCollection"></span><i class="dot"></i></button>
+      <button data-tab="achievements"><span class="ti">🏆</span><span data-i18n="tabAch"></span><i class="dot"></i></button>
+    </nav>
+  </section>
+</div>
+
+<div class="overlay" id="modal"></div>
+<div class="overlay" id="adStub"><div class="mcard"><div class="m-icon">📺</div><h2 id="adStubText"></h2><p id="adStubKind"></p></div></div>
+
+<script>
+'use strict';
+
+/* =====================================================================
+   КОНФИГ: все числа баланса и списки контента.
+   Поле icon — эмодзи или путь к картинке ("img/cat.png"): renderIcon()
+   сам подставит <img>, если строка похожа на файл.
+   ===================================================================== */
+const CONFIG = {
+  version: 1,
+  saveKey: 'catcafe_save_v1',
+  autosaveSeconds: 30,          // автосохранение
+  costGrowth: 1.15,             // цена = базовая × 1.15^количество
+  upgradeMult: 2,               // каждое улучшение удваивает доход
+  revealFraction: 0.5,          // сотрудник открывается, когда есть половина его цены
+  coinIcon: '🪙',
+  starIcon: '⭐',
+
+  // Тап по кофемашине: base × множители улучшений + доля дохода в секунду
+  tap: { base: 1, cpsShare: 0.02 },
+  machine: { icon: '☕', logo: '🐾', image: '' }, // image: картинка всей машины вместо CSS
+
+  // Зал: сколько фигурок кота показывать (1 + по одной за каждый рубеж)
+  hall: { extraAt: [10, 25, 50, 100], maxSprites: 28 },
+
+  // Сотрудники
+  workers: [
+    { id: 'barista',  icon: '😺', badge: '☕', cost: 15,        income: 0.1 },
+    { id: 'baker',    icon: '🐱', badge: '🥐', cost: 100,       income: 1 },
+    { id: 'waiter',   icon: '😸', badge: '🍽️', cost: 1100,      income: 8 },
+    { id: 'icecream', icon: '😻', badge: '🍦', cost: 12000,     income: 47 },
+    { id: 'pastry',   icon: '😽', badge: '🎂', cost: 130000,    income: 260 },
+    { id: 'sushi',    icon: '😼', badge: '🍣', cost: 1400000,   income: 1400 },
+    { id: 'dj',       icon: '🐈‍⬛', badge: '🎧', cost: 20000000,  income: 7800 },
+    { id: 'chef',     icon: '🐈', badge: '🍲', cost: 330000000, income: 44000 }
+  ],
+
+  // Улучшения. type 'tap' — сила тапа ×2; type 'worker' — доход сотрудника ×2 после need штук
+  upgrades: [
+    { id: 'tap1',  type: 'tap', icon: '⚙️', cost: 50 },
+    { id: 'tap2',  type: 'tap', icon: '🫘', cost: 500 },
+    { id: 'tap3',  type: 'tap', icon: '🏺', cost: 5000 },
+    { id: 'tap4',  type: 'tap', icon: '🥛', cost: 5e4 },
+    { id: 'tap5',  type: 'tap', icon: '🌿', cost: 5e5 },
+    { id: 'tap6',  type: 'tap', icon: '🎨', cost: 5e6 },
+    { id: 'tap7',  type: 'tap', icon: '🌀', cost: 5e7 },
+    { id: 'tap8',  type: 'tap', icon: '💎', cost: 5e8 },
+    { id: 'tap9',  type: 'tap', icon: '🌙', cost: 5e9 },
+    { id: 'tap10', type: 'tap', icon: '⚛️', cost: 5e10 },
+    { id: 'tap11', type: 'tap', icon: '🐾', cost: 5e11 },
+    { id: 'tap12', type: 'tap', icon: '🔥', cost: 5e12 },
+
+    { id: 'barista1',  type: 'worker', worker: 'barista',  need: 10,  icon: '🎽', cost: 300 },
+    { id: 'barista2',  type: 'worker', worker: 'barista',  need: 25,  icon: '🎨', cost: 3000 },
+    { id: 'barista3',  type: 'worker', worker: 'barista',  need: 50,  icon: '🥄', cost: 75000 },
+    { id: 'barista4',  type: 'worker', worker: 'barista',  need: 100, icon: '🏆', cost: 3e7 },
+    { id: 'baker1',    type: 'worker', worker: 'baker',    need: 10,  icon: '🧢', cost: 2000 },
+    { id: 'baker2',    type: 'worker', worker: 'baker',    need: 25,  icon: '🪵', cost: 20000 },
+    { id: 'baker3',    type: 'worker', worker: 'baker',    need: 50,  icon: '🥐', cost: 5e5 },
+    { id: 'baker4',    type: 'worker', worker: 'baker',    need: 100, icon: '🔥', cost: 2e8 },
+    { id: 'waiter1',   type: 'worker', worker: 'waiter',   need: 10,  icon: '🛼', cost: 22000 },
+    { id: 'waiter2',   type: 'worker', worker: 'waiter',   need: 25,  icon: '🛸', cost: 2.2e5 },
+    { id: 'waiter3',   type: 'worker', worker: 'waiter',   need: 50,  icon: '📜', cost: 5.5e6 },
+    { id: 'waiter4',   type: 'worker', worker: 'waiter',   need: 100, icon: '🌀', cost: 2.2e9 },
+    { id: 'icecream1', type: 'worker', worker: 'icecream', need: 10,  icon: '🧊', cost: 2.4e5 },
+    { id: 'icecream2', type: 'worker', worker: 'icecream', need: 25,  icon: '🍦', cost: 2.4e6 },
+    { id: 'icecream3', type: 'worker', worker: 'icecream', need: 50,  icon: '🐟', cost: 6e7 },
+    { id: 'icecream4', type: 'worker', worker: 'icecream', need: 100, icon: '❄️', cost: 2.4e10 },
+    { id: 'pastry1',   type: 'worker', worker: 'pastry',   need: 10,  icon: '🎀', cost: 2.6e6 },
+    { id: 'pastry2',   type: 'worker', worker: 'pastry',   need: 25,  icon: '🧶', cost: 2.6e7 },
+    { id: 'pastry3',   type: 'worker', worker: 'pastry',   need: 50,  icon: '🍰', cost: 6.5e8 },
+    { id: 'pastry4',   type: 'worker', worker: 'pastry',   need: 100, icon: '🎂', cost: 2.6e11 },
+    { id: 'sushi1',    type: 'worker', worker: 'sushi',    need: 10,  icon: '🔪', cost: 2.8e7 },
+    { id: 'sushi2',    type: 'worker', worker: 'sushi',    need: 25,  icon: '🐟', cost: 2.8e8 },
+    { id: 'sushi3',    type: 'worker', worker: 'sushi',    need: 50,  icon: '🍣', cost: 7e9 },
+    { id: 'sushi4',    type: 'worker', worker: 'sushi',    need: 100, icon: '⚔️', cost: 2.8e12 },
+    { id: 'dj1',       type: 'worker', worker: 'dj',       need: 10,  icon: '🎧', cost: 4e8 },
+    { id: 'dj2',       type: 'worker', worker: 'dj',       need: 25,  icon: '🧶', cost: 4e9 },
+    { id: 'dj3',       type: 'worker', worker: 'dj',       need: 50,  icon: '🎵', cost: 1e11 },
+    { id: 'dj4',       type: 'worker', worker: 'dj',       need: 100, icon: '🪩', cost: 4e13 },
+    { id: 'chef1',     type: 'worker', worker: 'chef',     need: 10,  icon: '👒', cost: 6.6e9 },
+    { id: 'chef2',     type: 'worker', worker: 'chef',     need: 25,  icon: '🥄', cost: 6.6e10 },
+    { id: 'chef3',     type: 'worker', worker: 'chef',     need: 50,  icon: '⭐', cost: 1.65e12 },
+    { id: 'chef4',     type: 'worker', worker: 'chef',     need: 100, icon: '🥸', cost: 6.6e14 }
+  ],
+
+  // Редкие гости и коллекция
+  guests: {
+    minInterval: 60, maxInterval: 180,  // секунд между визитами
+    stay: 10,                           // сколько секунд гость в кафе
+    coinsSeconds: 300,                  // бонус «доход за 5 минут»
+    minCoinsTaps: 30,                   // но не меньше, чем 30 тапов (для начала игры)
+    frenzyMult: 7, frenzyTime: 30,      // бонус «×7 дохода на 30 секунд»
+    collectionBonus: 0.01,              // +1% к доходу за каждого открытого гостя
+    preferNewChance: 0.6,               // шанс, что придёт ещё не открытый гость
+    rarityWeights: { common: 65, rare: 28, legendary: 7 },
+    list: [
+      { id: 'pirate',      icon: '😼', badge: '🏴‍☠️', rarity: 'common' },
+      { id: 'boots',       icon: '😺', badge: '👢', rarity: 'common' },
+      { id: 'coder',       icon: '🐱', badge: '💻', rarity: 'common' },
+      { id: 'artist',      icon: '😸', badge: '🎨', rarity: 'common' },
+      { id: 'fisher',      icon: '😻', badge: '🎣', rarity: 'common' },
+      { id: 'postman',     icon: '🐈', badge: '✉️', rarity: 'common' },
+      { id: 'gardener',    icon: '😽', badge: '🌻', rarity: 'common' },
+      { id: 'footballer',  icon: '😺', badge: '⚽', rarity: 'common' },
+      { id: 'tourist',     icon: '🐱', badge: '📷', rarity: 'common' },
+      { id: 'student',     icon: '😸', badge: '📚', rarity: 'common' },
+      { id: 'astronaut',   icon: '😺', badge: '🚀', rarity: 'rare' },
+      { id: 'detective',   icon: '😼', badge: '🔍', rarity: 'rare' },
+      { id: 'knight',      icon: '🐱', badge: '🛡️', rarity: 'rare' },
+      { id: 'magician',    icon: '😸', badge: '🎩', rarity: 'rare' },
+      { id: 'rockstar',    icon: '😻', badge: '🎸', rarity: 'rare' },
+      { id: 'ninja',       icon: '🐈‍⬛', badge: '🥷', rarity: 'rare' },
+      { id: 'king',        icon: '😼', badge: '👑', rarity: 'legendary' },
+      { id: 'wizard',      icon: '😺', badge: '🔮', rarity: 'legendary' },
+      { id: 'schrodinger', icon: '🙀', badge: '📦', rarity: 'legendary' },
+      { id: 'alien',       icon: '😽', badge: '👽', rarity: 'legendary' }
+    ]
+  },
+
+  // Престиж: звёзды = floor(sqrt(заработано_в_городе / starDivisor))
+  prestige: { starDivisor: 1e6, starBonus: 0.10 },
+
+  // Города (по кругу при каждом престиже). bg — картинка фона стены вместо градиента
+  cities: [
+    { id: 'catsville', icon: '🏡', bg: '', wall: ['#ffe9d2', '#ffd9b3'], floor: ['#c98b5a', '#b67747'], sky: ['#9fd8ff', '#e3f5ff'], decor: ['🫖', '🍪', '🥛'] },
+    { id: 'murmansk',  icon: '🚢', bg: '', wall: ['#e2f2ff', '#c4e2fb'], floor: ['#8fa7b8', '#7a93a6'], sky: ['#3d5a8c', '#a7c8ff'], decor: ['🐟', '🧣', '⛄'] },
+    { id: 'newyork',   icon: '🗽', bg: '', wall: ['#ffe2e8', '#ffc7d3'], floor: ['#6b5a7e', '#5a4a6c'], sky: ['#ffb199', '#ffe1a8'], decor: ['🥯', '🍩', '🌭'] },
+    { id: 'paris',     icon: '🗼', bg: '', wall: ['#f3e8ff', '#e2d0fb'], floor: ['#d9b48f', '#c79f78'], sky: ['#ffd1e8', '#fff0d6'], decor: ['🥖', '🧀', '🍷'] },
+    { id: 'tokyo',     icon: '🗻', bg: '', wall: ['#e6ffe9', '#c9f2d0'], floor: ['#a0705a', '#8a5d48'], sky: ['#ffc2d1', '#ffffff'], decor: ['🌸', '🍵', '🍡'] }
+  ],
+
+  // Офлайн-доход
+  offline: { maxSeconds: 4 * 3600, minSeconds: 60, rate: 1 },
+
+  // Ежедневная награда: max(coins, доход_в_секунду × cpsSec). На 7-й день — редкий гость
+  daily: {
+    days: [
+      { coins: 100,   cpsSec: 120 },
+      { coins: 300,   cpsSec: 300 },
+      { coins: 800,   cpsSec: 600 },
+      { coins: 2000,  cpsSec: 900 },
+      { coins: 5000,  cpsSec: 1200 },
+      { coins: 12000, cpsSec: 1800 },
+      { coins: 30000, cpsSec: 3600, guest: true }
+    ]
+  },
+
+  // Реклама
+  ads: {
+    rushMult: 2, rushTime: 300,      // «Час пик»: ×2 на 5 минут
+    offlineMult: 3,                  // «Утроить офлайн-заработок»
+    guestCooldown: 300,              // «Позвать гостя» — не чаще раза в 5 минут
+    fullscreenMinInterval: 60        // защита от слишком частых межстраничных
+  },
+
+  // Достижения: награда = max(reward, доход_в_секунду × rewardCpsSeconds)
+  achievementCpsSeconds: 60,
+  achievements: [
+    { id: 'first_cat',   icon: '🐾', type: 'workers',  n: 1,     reward: 50 },
+    { id: 'cats_10',     icon: '👥', type: 'workers',  n: 10,    reward: 500 },
+    { id: 'cats_50',     icon: '🏠', type: 'workers',  n: 50,    reward: 25000 },
+    { id: 'cats_100',    icon: '🏰', type: 'workers',  n: 100,   reward: 1e6 },
+    { id: 'taps_100',    icon: '👆', type: 'taps',     n: 100,   reward: 200 },
+    { id: 'taps_1000',   icon: '☕', type: 'taps',     n: 1000,  reward: 5000 },
+    { id: 'taps_10000',  icon: '💪', type: 'taps',     n: 10000, reward: 1e5 },
+    { id: 'earn_1k',     icon: '💰', type: 'earned',   n: 1e3,   reward: 300 },
+    { id: 'earn_1m',     icon: '💵', type: 'earned',   n: 1e6,   reward: 1e5 },
+    { id: 'earn_1b',     icon: '🏦', type: 'earned',   n: 1e9,   reward: 5e7 },
+    { id: 'earn_1t',     icon: '💎', type: 'earned',   n: 1e12,  reward: 5e10 },
+    { id: 'cps_100',     icon: '⚙️', type: 'cps',      n: 100,   reward: 20000 },
+    { id: 'cps_10k',     icon: '🚂', type: 'cps',      n: 1e4,   reward: 2e6 },
+    { id: 'guest_1',     icon: '🔔', type: 'guests',   n: 1,     reward: 500 },
+    { id: 'guests_10',   icon: '📖', type: 'guests',   n: 10,    reward: 5e5 },
+    { id: 'guests_20',   icon: '🌟', type: 'guests',   n: 20,    reward: 1e9 },
+    { id: 'prestige_1',  icon: '🧳', type: 'prestige', n: 1,     reward: 1e6 },
+    { id: 'prestige_5',  icon: '🌍', type: 'prestige', n: 5,     reward: 1e9 },
+    { id: 'upgrades_10', icon: '🔧', type: 'upgrades', n: 10,    reward: 10000 },
+    { id: 'daily_7',     icon: '📅', type: 'streak',   n: 7,     reward: 1e6 }
+  ]
+};
+
+/* =====================================================================
+   ТЕКСТЫ (русский и английский)
+   ===================================================================== */
+const I18N = {
+  ru: {
+    title: 'Котокафе',
+    perSec: '{x}/с',
+    tabCats: 'Коты', tabUpgrades: 'Улучшения', tabCollection: 'Коллекция', tabAch: 'Достижения',
+    buyMax: 'Макс',
+    perCat: '+{x}/с за кота', totalIncome: 'всего {x}/с',
+    unknownWorker: '???', revealAt: 'Появится, когда накопите {x}',
+    tapUpDesc: 'Доход за тап ×2',
+    workerUpDesc: '{name}: доход ×2',
+    needWorkers: 'Нужно {n} шт.: {name} ({have}/{n})',
+    noUpgrades: 'Все доступные улучшения куплены. Нанимайте котов дальше!',
+    upgradesTitle: 'Улучшения',
+    tapNow: 'Тап сейчас: +{x}',
+    prestigeTitle: '🏙️ Открыть кафе в новом городе',
+    prestigeStars: 'Звёзды Мяушлен: {s} ⭐ (+{b}% к доходу)',
+    prestigeEarned: 'Заработано в этом городе: {x}',
+    prestigeGain: 'При переезде: +{n} ⭐',
+    prestigeNext: 'Следующая звезда при {x}',
+    prestigeFirst: 'Первая звезда при {x} заработанных в городе',
+    prestigeBtn: 'Переехать: {city}',
+    prestigeConfirmTitle: 'Переезжаем в {city}?',
+    prestigeConfirmText: 'Монеты, сотрудники и улучшения сбросятся. Вы получите <b>{n} ⭐</b> (+{b}% к доходу навсегда). Коллекция и достижения останутся с вами.',
+    confirm: 'Переезжаем!', cancel: 'Остаться',
+    welcomeCity: 'Добро пожаловать: {city}!',
+    welcomeCityText: 'Звёзд Мяушлен: {s}. Доход +{b}% навсегда. Коты уже распаковывают фартуки!',
+    collectionHead: 'Открыто гостей: {n}/{total} · +{b}% к доходу',
+    collectionHint: 'Ловите редких гостей в зале: они заходят раз в 1–3 минуты.',
+    rarity_common: 'Обычные', rarity_rare: 'Редкие', rarity_legendary: 'Легендарные',
+    caught: 'Встречен: {n}',
+    achHead: 'Получено: {n}/{total}',
+    achReward: '+{x}',
+    achUnlocked: '🏆 {name} · +{x}',
+    offlineTitle: 'С возвращением!',
+    offlineText: 'Пока вас не было ({time}), коты заработали:',
+    collect: 'Забрать {x}',
+    triple: '📺 Утроить: {x}',
+    dailyTitle: 'Ежедневная награда',
+    dailyText: 'Заходите каждый день! На 7-й день придёт редкий гость.',
+    day: 'День {n}', claim: 'Забрать', dailyGuest: 'Гость!',
+    dailyClaimed: 'Награда дня: +{x}',
+    rushBtn: '📺 Час пик ×2', rushActive: '🔥 ×2 {t}',
+    guestBtn: '📺 Позвать гостя', guestWait: '🔔 {t}', guestHereBtn: '🔔 Гость в зале!',
+    rushStarted: '🔥 Час пик! Доход ×2 на 5 минут',
+    frenzy: '✨ ×7 {t}',
+    guestArrived: '🔔 В кафе заглянул гость! Скорее тапните по нему',
+    guestCoins: '{name}: +{x}!',
+    guestFrenzy: '{name}: доход ×7 на 30 секунд!',
+    guestNew: '📖 Новый гость в коллекции! +1% к доходу',
+    guestLeft: 'Гость ушёл… Ждите следующего!',
+    adError: 'Реклама сейчас недоступна, попробуйте позже',
+    adStub: 'Реклама (заглушка)',
+    adStubRewarded: 'Видео за награду', adStubFullscreen: 'Межстраничная реклама',
+    newWorker: 'Новый сотрудник ищет работу: {name}!',
+    ok: 'Отлично!',
+    hours: '{h} ч {m} мин', minutes: '{m} мин', seconds: '{s} с',
+    workers: {
+      barista: 'Кот-бариста', baker: 'Кошка-пекарь', waiter: 'Кот-официант', icecream: 'Кот-мороженщик',
+      pastry: 'Кошка-кондитер', sushi: 'Кот-суши-мастер', dj: 'Кот-диджей', chef: 'Кот-шеф-повар'
+    },
+    upgrades: {
+      tap1: 'Новая кофемашина', tap2: 'Зёрна арабики', tap3: 'Золотая турка', tap4: 'Мурчащий капучинатор',
+      tap5: 'Сироп из кошачьей мяты', tap6: 'Латте-арт с усами', tap7: 'Турбо-кофемолка', tap8: 'Бриллиантовый портафильтр',
+      tap9: 'Кофе с обратной стороны Луны', tap10: 'Квантовая эспрессо-машина', tap11: 'Лапа Мидаса', tap12: 'Кофейный термоядерный реактор',
+      barista1: 'Фартук с рыбками', barista2: 'Кошачий латте-арт', barista3: 'Усы-взбивалки', barista4: 'Чемпион мира по мурчанию',
+      baker1: 'Колпак для пекаря', baker2: 'Скалка-когтеточка', baker3: 'Круассаны в форме рыбок', baker4: 'Печь на кошачьей мяте',
+      waiter1: 'Роликовые коньки для официанта', waiter2: 'Антигравитационный поднос', waiter3: 'Меню, которое держит хвост', waiter4: 'Телепорт к столику',
+      icecream1: 'Холодильник для лапок', icecream2: 'Хрустящие вафельные рожки', icecream3: 'Пломбир со вкусом тунца', icecream4: 'Снежная пушка',
+      pastry1: 'Кондитерский мешок с бантиком', pastry2: 'Торт в форме клубка', pastry3: 'Крем из сливок мечты', pastry4: 'Торт до потолка',
+      sushi1: 'Нож, острый как коготь', sushi2: 'Подписка на лосося', sushi3: 'Ролл «Филадельфи-мяу»', sushi4: 'Путь кота-самурая',
+      dj1: 'Наушники с ушками', dj2: 'Пульт из клубка', dj3: 'Ремикс мурчания', dj4: 'Диско-шар из фольги',
+      chef1: 'Высокий колпак шефа', chef2: 'Половник судьбы', chef3: 'Звёздное меню', chef4: 'Усы Мяушлен'
+    },
+    guests: {
+      pirate: 'Кот-пират', boots: 'Кот в сапогах', coder: 'Кот-программист', artist: 'Кот-художник',
+      fisher: 'Кот-рыбак', postman: 'Кот-почтальон', gardener: 'Кот-садовник', footballer: 'Кот-футболист',
+      tourist: 'Кот-турист', student: 'Кот-студент', astronaut: 'Кот-космонавт', detective: 'Кот-детектив',
+      knight: 'Кот-рыцарь', magician: 'Кот-фокусник', rockstar: 'Кот-рок-звезда', ninja: 'Кот-ниндзя',
+      king: 'Кот-король', wizard: 'Кот-волшебник', schrodinger: 'Кот Шрёдингера', alien: 'Кот с Марса'
+    },
+    cities: { catsville: 'Котоград', murmansk: 'Мурманск', newyork: 'Мяу-Йорк', paris: 'Пурриж', tokyo: 'Токимяу' },
+    achievements: {
+      first_cat:   ['Первый сотрудник', 'Наймите первого кота'],
+      cats_10:     ['Уютная команда', 'Наймите 10 котов в одном городе'],
+      cats_50:     ['Кошачий профсоюз', 'Наймите 50 котов в одном городе'],
+      cats_100:    ['Сто хвостов', 'Наймите 100 котов в одном городе'],
+      taps_100:    ['Разминка лапок', 'Сделайте 100 тапов'],
+      taps_1000:   ['Кофеман', 'Сделайте 1 000 тапов'],
+      taps_10000:  ['Железная лапа', 'Сделайте 10 000 тапов'],
+      earn_1k:     ['Первая выручка', 'Заработайте 1K монет за всё время'],
+      earn_1m:     ['Миллион на чаевых', 'Заработайте 1M монет за всё время'],
+      earn_1b:     ['Кофейная империя', 'Заработайте 1B монет за всё время'],
+      earn_1t:     ['Триллион мурлык', 'Заработайте 1T монет за всё время'],
+      cps_100:     ['Само мурлычется', 'Доход 100 монет в секунду'],
+      cps_10k:     ['Мурчащий конвейер', 'Доход 10K монет в секунду'],
+      guest_1:     ['Добро пожаловать!', 'Встретьте первого редкого гостя'],
+      guests_10:   ['Звёздные гости', 'Откройте 10 гостей в коллекции'],
+      guests_20:   ['Полный зал', 'Соберите всю коллекцию гостей'],
+      prestige_1:  ['Переезд', 'Откройте кафе в новом городе'],
+      prestige_5:  ['Кругосветка', 'Откройте кафе в новом городе 5 раз'],
+      upgrades_10: ['Модернизация', 'Купите 10 улучшений'],
+      daily_7:     ['Постоянный клиент', 'Заходите в игру 7 дней подряд']
+    }
+  },
+  en: {
+    title: 'Cat Café',
+    perSec: '{x}/s',
+    tabCats: 'Cats', tabUpgrades: 'Upgrades', tabCollection: 'Collection', tabAch: 'Achievements',
+    buyMax: 'Max',
+    perCat: '+{x}/s per cat', totalIncome: 'total {x}/s',
+    unknownWorker: '???', revealAt: 'Shows up when you have {x}',
+    tapUpDesc: 'Tap income ×2',
+    workerUpDesc: '{name}: income ×2',
+    needWorkers: 'Requires {n}: {name} ({have}/{n})',
+    noUpgrades: 'All available upgrades bought. Keep hiring cats!',
+    upgradesTitle: 'Upgrades',
+    tapNow: 'Tap now: +{x}',
+    prestigeTitle: '🏙️ Open a café in a new city',
+    prestigeStars: 'Meowchelin stars: {s} ⭐ (+{b}% income)',
+    prestigeEarned: 'Earned in this city: {x}',
+    prestigeGain: 'Move now: +{n} ⭐',
+    prestigeNext: 'Next star at {x}',
+    prestigeFirst: 'First star at {x} earned in this city',
+    prestigeBtn: 'Move to {city}',
+    prestigeConfirmTitle: 'Move to {city}?',
+    prestigeConfirmText: 'Coins, staff and upgrades will be reset. You will get <b>{n} ⭐</b> (+{b}% income forever). Collection and achievements stay with you.',
+    confirm: 'Let\'s go!', cancel: 'Stay',
+    welcomeCity: 'Welcome to {city}!',
+    welcomeCityText: 'Meowchelin stars: {s}. Income +{b}% forever. The cats are unpacking their aprons!',
+    collectionHead: 'Guests found: {n}/{total} · +{b}% income',
+    collectionHint: 'Catch rare guests in the café: they drop by every 1–3 minutes.',
+    rarity_common: 'Common', rarity_rare: 'Rare', rarity_legendary: 'Legendary',
+    caught: 'Met: {n}',
+    achHead: 'Unlocked: {n}/{total}',
+    achReward: '+{x}',
+    achUnlocked: '🏆 {name} · +{x}',
+    offlineTitle: 'Welcome back!',
+    offlineText: 'While you were away ({time}), the cats earned:',
+    collect: 'Collect {x}',
+    triple: '📺 Triple it: {x}',
+    dailyTitle: 'Daily reward',
+    dailyText: 'Come back every day! On day 7 a rare guest arrives.',
+    day: 'Day {n}', claim: 'Claim', dailyGuest: 'Guest!',
+    dailyClaimed: 'Daily reward: +{x}',
+    rushBtn: '📺 Rush hour ×2', rushActive: '🔥 ×2 {t}',
+    guestBtn: '📺 Invite a guest', guestWait: '🔔 {t}', guestHereBtn: '🔔 Guest is here!',
+    rushStarted: '🔥 Rush hour! Income ×2 for 5 minutes',
+    frenzy: '✨ ×7 {t}',
+    guestArrived: '🔔 A guest dropped by! Tap it quickly',
+    guestCoins: '{name}: +{x}!',
+    guestFrenzy: '{name}: income ×7 for 30 seconds!',
+    guestNew: '📖 New guest in the collection! +1% income',
+    guestLeft: 'The guest left… Wait for the next one!',
+    adError: 'Ads are not available right now, try later',
+    adStub: 'Advertisement (stub)',
+    adStubRewarded: 'Rewarded video', adStubFullscreen: 'Interstitial ad',
+    newWorker: 'A new worker wants a job: {name}!',
+    ok: 'Great!',
+    hours: '{h}h {m}m', minutes: '{m} min', seconds: '{s} s',
+    workers: {
+      barista: 'Barista Cat', baker: 'Baker Cat', waiter: 'Waiter Cat', icecream: 'Ice Cream Cat',
+      pastry: 'Pastry Cat', sushi: 'Sushi Master Cat', dj: 'DJ Cat', chef: 'Head Chef Cat'
+    },
+    upgrades: {
+      tap1: 'New Coffee Machine', tap2: 'Arabica Beans', tap3: 'Golden Cezve', tap4: 'Purring Cappuccinator',
+      tap5: 'Catnip Syrup', tap6: 'Whisker Latte Art', tap7: 'Turbo Grinder', tap8: 'Diamond Portafilter',
+      tap9: 'Coffee from the Dark Side of the Moon', tap10: 'Quantum Espresso Machine', tap11: 'Paw of Midas', tap12: 'Coffee Fusion Reactor',
+      barista1: 'Fishy Apron', barista2: 'Kitty Latte Art', barista3: 'Whisk Whiskers', barista4: 'World Purring Champion',
+      baker1: 'Baker\'s Toque', baker2: 'Scratching Rolling Pin', baker3: 'Fish-Shaped Croissants', baker4: 'Catnip-Fired Oven',
+      waiter1: 'Roller Skates for the Waiter', waiter2: 'Anti-Gravity Tray', waiter3: 'Tail-Held Menu', waiter4: 'Table Teleporter',
+      icecream1: 'Paw Freezer', icecream2: 'Extra Crunchy Cones', icecream3: 'Tuna-Flavored Gelato', icecream4: 'Snow Cannon',
+      pastry1: 'Piping Bag with a Bow', pastry2: 'Yarn Ball Cake', pastry3: 'Dream Cream Frosting', pastry4: 'Ceiling-High Cake',
+      sushi1: 'Claw-Sharp Knife', sushi2: 'Salmon Subscription', sushi3: 'Phila-Meow Roll', sushi4: 'Way of the Samurai Cat',
+      dj1: 'Cat-Ear Headphones', dj2: 'Yarn Ball Turntable', dj3: 'Purr Remix', dj4: 'Tinfoil Disco Ball',
+      chef1: 'Tall Chef\'s Hat', chef2: 'Ladle of Destiny', chef3: 'Starry Menu', chef4: 'Meowchelin Whiskers'
+    },
+    guests: {
+      pirate: 'Pirate Cat', boots: 'Puss in Boots', coder: 'Coder Cat', artist: 'Artist Cat',
+      fisher: 'Fisher Cat', postman: 'Postman Cat', gardener: 'Gardener Cat', footballer: 'Footballer Cat',
+      tourist: 'Tourist Cat', student: 'Student Cat', astronaut: 'Astronaut Cat', detective: 'Detective Cat',
+      knight: 'Knight Cat', magician: 'Magician Cat', rockstar: 'Rock Star Cat', ninja: 'Ninja Cat',
+      king: 'King Cat', wizard: 'Wizard Cat', schrodinger: 'Schrödinger\'s Cat', alien: 'Cat from Mars'
+    },
+    cities: { catsville: 'Catsville', murmansk: 'Meowmansk', newyork: 'New Meowk', paris: 'Purris', tokyo: 'Meowkyo' },
+    achievements: {
+      first_cat:   ['First Employee', 'Hire your first cat'],
+      cats_10:     ['Cozy Crew', 'Hire 10 cats in one city'],
+      cats_50:     ['Cat Union', 'Hire 50 cats in one city'],
+      cats_100:    ['A Hundred Tails', 'Hire 100 cats in one city'],
+      taps_100:    ['Paw Warm-up', 'Tap 100 times'],
+      taps_1000:   ['Coffee Addict', 'Tap 1,000 times'],
+      taps_10000:  ['Iron Paw', 'Tap 10,000 times'],
+      earn_1k:     ['First Revenue', 'Earn 1K coins in total'],
+      earn_1m:     ['Millionaire of Tips', 'Earn 1M coins in total'],
+      earn_1b:     ['Coffee Empire', 'Earn 1B coins in total'],
+      earn_1t:     ['Trillion Purrs', 'Earn 1T coins in total'],
+      cps_100:     ['It Purrs Itself', 'Reach 100 coins per second'],
+      cps_10k:     ['Purring Conveyor', 'Reach 10K coins per second'],
+      guest_1:     ['Welcome!', 'Meet your first rare guest'],
+      guests_10:   ['Star Guests', 'Find 10 guests for the collection'],
+      guests_20:   ['Full House', 'Complete the guest collection'],
+      prestige_1:  ['Relocation', 'Open a café in a new city'],
+      prestige_5:  ['World Tour', 'Open a café in a new city 5 times'],
+      upgrades_10: ['Modernization', 'Buy 10 upgrades'],
+      daily_7:     ['Regular Customer', 'Play 7 days in a row']
+    }
+  }
+};
+
+/* =====================================================================
+   УТИЛИТЫ
+   ===================================================================== */
+const $ = (s, r = document) => r.querySelector(s);
+const rand = (a, b) => a + Math.random() * (b - a);
+const pad2 = n => (n < 10 ? '0' : '') + n;
+
+// Детерминированный генератор случайных чисел (стабильные позиции котов в зале)
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+function withTimeout(promise, ms) {
+  return Promise.race([promise, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
+}
+
+// Сокращение больших чисел: 1.5K, 2.3M, 4.1B, 7.2T, затем Qa, Qi... и aa, ab...
+const SUFFIXES = ['', 'K', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc'];
+function suffix(i) {
+  if (i < SUFFIXES.length) return SUFFIXES[i];
+  const k = i - SUFFIXES.length;
+  return String.fromCharCode(97 + Math.floor(k / 26) % 26) + String.fromCharCode(97 + k % 26);
+}
+function fmt(n, withFraction) {
+  if (!isFinite(n)) return '∞';
+  if (n < 0) return '-' + fmt(-n, withFraction);
+  if (n < 1000) {
+    if (withFraction && n < 100 && Math.floor(n) !== n) {
+      return (Math.floor(n * 10) / 10).toFixed(1).replace(/\.0$/, '');
+    }
+    return String(Math.floor(n));
+  }
+  let e = Math.floor(Math.log10(n) / 3);
+  let v = n / Math.pow(10, e * 3);
+  if (v >= 1000) { e++; v /= 1000; }
+  if (v < 1) { e--; v *= 1000; }
+  const s = v < 100 ? (Math.floor(v * 10) / 10).toFixed(1).replace(/\.0$/, '') : String(Math.floor(v));
+  return s + suffix(e);
+}
+function fmtClock(sec) {
+  sec = Math.max(0, Math.ceil(sec));
+  return Math.floor(sec / 60) + ':' + pad2(sec % 60);
+}
+function fmtDuration(sec) {
+  sec = Math.floor(sec);
+  const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60);
+  if (h > 0) return t('hours', { h, m });
+  if (m > 0) return t('minutes', { m });
+  return t('seconds', { s: sec });
+}
+function todayStr(d) {
+  d = d || new Date();
+  return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+}
+
+// Иконка: эмодзи или картинка + необязательный значок
+function iconPart(src, cls) {
+  if (!src) return '';
+  if (/\.(png|jpe?g|gif|svg|webp)(\?.*)?$/i.test(src)) return `<img class="${cls}" src="${src}" alt="">`;
+  return `<span class="${cls}">${src}</span>`;
+}
+function renderIcon(icon, badge, extraCls) {
+  return `<span class="ic ${extraCls || ''}">${iconPart(icon, 'emo')}${iconPart(badge, 'bdg')}</span>`;
+}
+
+/* =====================================================================
+   ЛОКАЛИЗАЦИЯ
+   ===================================================================== */
+let LANG = 'ru';
+function lookup(lang, key) {
+  return key.split('.').reduce((o, k) => (o == null ? undefined : o[k]), I18N[lang]);
+}
+function t(key, params) {
+  let v = lookup(LANG, key);
+  if (v === undefined) v = lookup('ru', key);
+  if (v === undefined) { console.warn('[i18n] нет текста', key); return key; }
+  if (params && typeof v === 'string') v = v.replace(/\{(\w+)\}/g, (m, k) => (params[k] !== undefined ? params[k] : m));
+  return v;
+}
+function detectLang(code) {
+  code = String(code || '').toLowerCase().slice(0, 2);
+  // Русский для русскоязычных и соседних доменов, иначе английский
+  return ['ru', 'be', 'kk', 'uk', 'uz', 'ky', 'tg', 'az', 'hy'].includes(code) ? 'ru' : 'en';
+}
+const workerName = i => t('workers.' + CONFIG.workers[i].id);
+const cityOf = n => CONFIG.cities[((n % CONFIG.cities.length) + CONFIG.cities.length) % CONFIG.cities.length];
+const cityName = c => t('cities.' + c.id);
+
+/* =====================================================================
+   СОСТОЯНИЕ ИГРЫ
+   ===================================================================== */
+function defaultState() {
+  return {
+    v: CONFIG.version,
+    coins: 0,
+    runEarned: 0,          // заработано в текущем городе (для звёзд)
+    allTimeEarned: 0,      // заработано за всё время
+    workers: CONFIG.workers.map(() => 0),
+    revealed: 0,           // сколько сотрудников уже показаны (следующий — силуэт)
+    upgrades: {},          // купленные улучшения в текущем городе
+    stars: 0,
+    prestigeCount: 0,
+    guests: {},            // id гостя -> сколько раз встречен
+    achievements: {},
+    stats: { taps: 0, guestsCaught: 0, upgradesBought: 0, bestStreak: 0 },
+    rushLeft: 0,           // секунд «Часа пик»
+    frenzyLeft: 0,         // секунд «×7» от гостя
+    guestTimer: rand(CONFIG.guests.minInterval, CONFIG.guests.maxInterval),
+    guestCallAt: 0,        // время (мс), когда снова можно позвать гостя за рекламу
+    daily: { last: '', streak: 0 },
+    muted: false,
+    buyMode: 1,
+    savedAt: 0
+  };
+}
+
+function normalizeState(d) {
+  const s = defaultState();
+  if (!d || typeof d !== 'object') return s;
+  const num = (v, def) => (typeof v === 'number' && isFinite(v) ? v : def);
+  s.coins = Math.max(0, num(d.coins, 0));
+  s.runEarned = Math.max(0, num(d.runEarned, 0));
+  s.allTimeEarned = Math.max(0, num(d.allTimeEarned, 0));
+  s.workers = CONFIG.workers.map((_, i) => Math.max(0, Math.floor(num((d.workers || [])[i], 0))));
+  s.revealed = Math.max(0, Math.min(CONFIG.workers.length, Math.floor(num(d.revealed, 0))));
+  s.upgrades = (d.upgrades && typeof d.upgrades === 'object') ? d.upgrades : {};
+  s.stars = Math.max(0, Math.floor(num(d.stars, 0)));
+  s.prestigeCount = Math.max(0, Math.floor(num(d.prestigeCount, 0)));
+  s.guests = (d.guests && typeof d.guests === 'object') ? d.guests : {};
+  s.achievements = (d.achievements && typeof d.achievements === 'object') ? d.achievements : {};
+  s.stats = Object.assign(s.stats, d.stats || {});
+  s.rushLeft = Math.max(0, num(d.rushLeft, 0));
+  s.frenzyLeft = Math.max(0, num(d.frenzyLeft, 0));
+  s.guestTimer = Math.max(5, num(d.guestTimer, s.guestTimer));
+  s.guestCallAt = num(d.guestCallAt, 0);
+  s.daily = Object.assign(s.daily, d.daily || {});
+  s.muted = !!d.muted;
+  s.buyMode = [1, 10, 'max'].includes(d.buyMode) ? d.buyMode : 1;
+  s.savedAt = num(d.savedAt, 0);
+  return s;
+}
+
+let S = defaultState();
+// Производные значения (пересчитываются в recalc)
+const D = { tapMult: 1, workerMult: [], perm: 1, baseCps: 0, guestsFound: 0 };
+const WORKER_INDEX = {};
+CONFIG.workers.forEach((w, i) => { WORKER_INDEX[w.id] = i; });
+
+function guestsFound() { return CONFIG.guests.list.filter(g => S.guests[g.id]).length; }
+
+function recalc() {
+  D.tapMult = 1;
+  D.workerMult = CONFIG.workers.map(() => 1);
+  for (const u of CONFIG.upgrades) {
+    if (!S.upgrades[u.id]) continue;
+    if (u.type === 'tap') D.tapMult *= CONFIG.upgradeMult;
+    else D.workerMult[WORKER_INDEX[u.worker]] *= CONFIG.upgradeMult;
+  }
+  D.guestsFound = guestsFound();
+  D.perm = (1 + S.stars * CONFIG.prestige.starBonus) * (1 + D.guestsFound * CONFIG.guests.collectionBonus);
+  let sum = 0;
+  CONFIG.workers.forEach((w, i) => { sum += w.income * S.workers[i] * D.workerMult[i]; });
+  D.baseCps = sum * D.perm;
+}
+function boostMult() {
+  return (S.rushLeft > 0 ? CONFIG.ads.rushMult : 1) * (S.frenzyLeft > 0 ? CONFIG.guests.frenzyMult : 1);
+}
+function cps() { return D.baseCps * boostMult(); }
+function tapValue() { return CONFIG.tap.base * D.tapMult * D.perm * boostMult() + cps() * CONFIG.tap.cpsShare; }
+function workerUnitIncome(i) { return CONFIG.workers[i].income * D.workerMult[i] * D.perm; }
+
+// gift = true: подарок (достижение, ежедневка) — не учитывается для звёзд Мяушлен
+function earn(x, gift) {
+  if (!(x > 0)) return;
+  S.coins += x; S.allTimeEarned += x;
+  if (!gift) S.runEarned += x;
+}
+
+// Цена n сотрудников подряд: base × 1.15^c × (1.15^n − 1) / 0.15
+function costFor(i, n) {
+  const g = CONFIG.costGrowth, c = S.workers[i];
+  return CONFIG.workers[i].cost * Math.pow(g, c) * (Math.pow(g, n) - 1) / (g - 1);
+}
+function maxAffordable(i) {
+  const g = CONFIG.costGrowth;
+  const first = CONFIG.workers[i].cost * Math.pow(g, S.workers[i]);
+  let n = Math.floor(Math.log(S.coins * (g - 1) / first + 1) / Math.log(g));
+  if (!isFinite(n) || n < 0) n = 0;
+  while (n > 0 && costFor(i, n) > S.coins) n--;
+  while (costFor(i, n + 1) <= S.coins) n++;
+  return n;
+}
+function buyAmount(i) {
+  if (S.buyMode === 'max') return Math.max(1, maxAffordable(i));
+  return S.buyMode;
+}
+
+function pendingStars() { return Math.floor(Math.sqrt(S.runEarned / CONFIG.prestige.starDivisor)); }
+
+/* =====================================================================
+   ЯНДЕКС SDK + ЗАГЛУШКИ
+   ===================================================================== */
+const SDK = {
+  ysdk: null,
+  player: null,
+  adActive: false,
+  lastFullscreen: 0,
+  gameplayOn: false,
+
+  async init() {
+    try {
+      if (typeof YaGames === 'undefined') throw new Error('SDK не найден');
+      this.ysdk = await withTimeout(YaGames.init(), 6000);
+      try { LANG = detectLang(this.ysdk.environment.i18n.lang); } catch (e) { LANG = 'ru'; }
+      try { this.player = await withTimeout(this.ysdk.getPlayer({ scopes: false }), 4000); } catch (e) { this.player = null; }
+      console.info('[SDK] Яндекс Игры подключены');
+    } catch (e) {
+      console.info('[SDK] Работаем на заглушках:', e.message);
+      this.ysdk = null;
+      LANG = detectLang(navigator.language || 'ru');
+    }
+  },
+
+  ready() {
+    try { if (this.ysdk && this.ysdk.features && this.ysdk.features.LoadingAPI) this.ysdk.features.LoadingAPI.ready(); } catch (e) {}
+  },
+
+  // Разметка геймплея для платформы (если API доступно)
+  gameplay(on) {
+    if (this.gameplayOn === on) return;
+    this.gameplayOn = on;
+    try {
+      const api = this.ysdk && this.ysdk.features && this.ysdk.features.GameplayAPI;
+      if (api) on ? api.start() : api.stop();
+    } catch (e) {}
+  },
+
+  async load() {
+    let local = null, cloud = null;
+    try { local = JSON.parse(localStorage.getItem(CONFIG.saveKey) || 'null'); } catch (e) {}
+    if (this.player) {
+      try {
+        const d = await withTimeout(this.player.getData(['save']), 4000);
+        cloud = d && d.save ? d.save : null;
+      } catch (e) {}
+    }
+    if (cloud && local) return (cloud.savedAt || 0) >= (local.savedAt || 0) ? cloud : local;
+    return cloud || local;
+  },
+
+  save(data, flush) {
+    try { localStorage.setItem(CONFIG.saveKey, JSON.stringify(data)); } catch (e) {}
+    if (this.player) {
+      try {
+        const p = this.player.setData({ save: data }, !!flush);
+        if (p && p.catch) p.catch(e => console.warn('[SDK] setData', e));
+      } catch (e) {}
+    }
+  },
+
+  // Реклама за вознаграждение. Награда выдаётся ТОЛЬКО в onRewarded
+  showRewarded(onRewarded) {
+    if (this.adActive) return;
+    this.adActive = true;
+    Game.pause('ad');
+    let closed = false;
+    const finish = () => {
+      if (closed) return;
+      closed = true;
+      this.adActive = false;
+      Game.resume('ad');
+    };
+    const reward = () => { try { onRewarded(); } catch (e) { console.error(e); } };
+    if (!this.ysdk) { StubAd.show(true, reward, finish); return; }
+    try {
+      this.ysdk.adv.showRewardedVideo({
+        callbacks: {
+          onOpen: () => {},
+          onRewarded: reward,
+          onClose: finish,
+          onError: (e) => { console.warn('[SDK] rewarded', e); toast(t('adError')); finish(); }
+        }
+      });
+    } catch (e) { toast(t('adError')); finish(); }
+  },
+
+  // Полноэкранная реклама (престиж и возврат в игру)
+  showFullscreen(done) {
+    const callDone = () => { if (done) { const d = done; done = null; d(); } };
+    const now = Date.now();
+    if (this.adActive || now - this.lastFullscreen < CONFIG.ads.fullscreenMinInterval * 1000) { callDone(); return; }
+    this.lastFullscreen = now;
+    this.adActive = true;
+    Game.pause('ad');
+    let closed = false;
+    const finish = () => {
+      if (closed) return;
+      closed = true;
+      this.adActive = false;
+      Game.resume('ad');
+      callDone();
+    };
+    if (!this.ysdk) { StubAd.show(false, null, finish); return; }
+    try {
+      this.ysdk.adv.showFullscreenAdv({
+        callbacks: { onOpen: () => {}, onClose: finish, onError: finish, onOffline: finish }
+      });
+    } catch (e) { finish(); }
+  }
+};
+
+// Заглушка рекламы для локального запуска: короткое окно и «просмотр»
+const StubAd = {
+  show(rewarded, onRewarded, onClose) {
+    const el = $('#adStub');
+    $('#adStubText').textContent = t('adStub');
+    $('#adStubKind').textContent = rewarded ? t('adStubRewarded') : t('adStubFullscreen');
+    el.classList.add('show');
+    setTimeout(() => {
+      el.classList.remove('show');
+      if (onRewarded) onRewarded();
+      onClose();
+    }, 1500);
+  }
+};
+
+/* =====================================================================
+   ПАУЗА (реклама, свёрнутая вкладка)
+   ===================================================================== */
+const Game = {
+  reasons: new Set(),
+  started: false,
+  get paused() { return this.reasons.size > 0; },
+  pause(reason) {
+    const was = this.paused;
+    this.reasons.add(reason);
+    if (!was) { Sound.suspend(); SDK.gameplay(false); }
+  },
+  resume(reason) {
+    if (!this.reasons.delete(reason)) return;
+    if (!this.paused) {
+      Sound.resume();
+      lastFrame = performance.now();
+      if (this.started) SDK.gameplay(true);
+    }
+  }
+};
+
+/* =====================================================================
+   ЗВУК (синтез WebAudio, без файлов)
+   ===================================================================== */
+const Sound = {
+  ctx: null, master: null,
+  init() {
+    if (this.ctx) return;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    try {
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = 0.22;
+      this.master.connect(this.ctx.destination);
+    } catch (e) { this.ctx = null; }
+  },
+  unlock() {
+    if (S.muted || Game.paused) return;
+    this.init();
+    if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
+  },
+  suspend() { if (this.ctx && this.ctx.state === 'running') this.ctx.suspend().catch(() => {}); },
+  resume() { if (this.ctx && !S.muted && this.ctx.state === 'suspended') this.ctx.resume().catch(() => {}); },
+  tone(f, dur, type, vol, f2, delay) {
+    const c = this.ctx, t0 = c.currentTime + (delay || 0);
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = type || 'sine';
+    o.frequency.setValueAtTime(f, t0);
+    if (f2) o.frequency.exponentialRampToValueAtTime(f2, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol || 0.5, t0 + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + dur + 0.03);
+  },
+  meow() {
+    const c = this.ctx, t0 = c.currentTime;
+    const o = c.createOscillator(), f = c.createBiquadFilter(), g = c.createGain();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(480, t0);
+    o.frequency.linearRampToValueAtTime(760, t0 + 0.12);
+    o.frequency.linearRampToValueAtTime(420, t0 + 0.38);
+    f.type = 'lowpass'; f.frequency.setValueAtTime(1400, t0); f.Q.value = 6;
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(0.35, t0 + 0.04);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.4);
+    o.connect(f); f.connect(g); g.connect(this.master);
+    o.start(t0); o.stop(t0 + 0.45);
+  },
+  play(name) {
+    if (S.muted || Game.paused) return;
+    this.init();
+    if (!this.ctx || this.ctx.state !== 'running') return;
+    switch (name) {
+      case 'tap': this.tone(520 + Math.random() * 90, 0.08, 'triangle', 0.45, 820); break;
+      case 'buy': this.tone(660, 0.07, 'square', 0.22); this.tone(990, 0.12, 'square', 0.22, null, 0.07); break;
+      case 'coin': this.tone(988, 0.06, 'square', 0.2); this.tone(1319, 0.16, 'square', 0.2, null, 0.06); break;
+      case 'bell': this.tone(1320, 0.25, 'sine', 0.4); this.tone(1760, 0.35, 'sine', 0.3, null, 0.12); break;
+      case 'meow': this.meow(); break;
+      case 'click': this.tone(700, 0.04, 'triangle', 0.25); break;
+      case 'achieve': [523, 659, 784, 1046].forEach((f, k) => this.tone(f, 0.18, 'triangle', 0.3, null, k * 0.08)); break;
+      case 'error': this.tone(220, 0.12, 'square', 0.15, 180); break;
+    }
+  }
+};
+
+/* =====================================================================
+   ИНТЕРФЕЙС: окна и уведомления
+   ===================================================================== */
+const Modal = {
+  queue: [], current: null,
+  show(o) { this.queue.push(o); if (!this.current) this.next(); },
+  next() {
+    const el = $('#modal');
+    const o = this.queue.shift() || null;
+    this.current = o;
+    if (!o) { el.classList.remove('show'); el.innerHTML = ''; return; }
+    el.innerHTML = `<div class="mcard">${o.icon ? `<div class="m-icon">${o.icon}</div>` : ''}<h2>${o.title}</h2><div>${o.html || ''}</div><div class="m-btns"></div></div>`;
+    const box = el.querySelector('.m-btns');
+    (o.buttons || [{ text: t('ok'), cls: 'primary' }]).forEach(b => {
+      const btn = document.createElement('button');
+      btn.className = 'btn ' + (b.cls || '');
+      btn.innerHTML = b.text;
+      btn.addEventListener('click', () => {
+        if (this.current !== o) return;
+        Sound.play('click');
+        const keepOpen = b.onClick ? b.onClick() : false;
+        if (!keepOpen && this.current === o) this.next();
+      });
+      box.appendChild(btn);
+    });
+    el.classList.add('show');
+  },
+  closeIf(o) { if (this.current === o) this.next(); }
+};
+
+function toast(text, cls) {
+  const box = $('#toasts');
+  while (box.children.length >= 3) box.firstChild.remove();
+  const el = document.createElement('div');
+  el.className = 'toast ' + (cls || '');
+  el.innerHTML = text;
+  box.appendChild(el);
+  setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 400); }, 2600);
+}
+
+/* =====================================================================
+   ЗАЛ: кофемашина, коты, эффекты
+   ===================================================================== */
+const hall = $('#hall');
+function resizeHall() {
+  const r = hall.getBoundingClientRect();
+  const u = Math.max(2, Math.min(7.5, Math.min(r.width, r.height * 1.25) / 100));
+  hall.style.setProperty('--u', u.toFixed(2) + 'px');
+}
+
+function renderMachine() {
+  const m = CONFIG.machine;
+  $('#machine').innerHTML = m.image
+    ? `<img src="${m.image}" alt="">`
+    : `<div class="m-top"></div>
+       <div class="m-body"><div class="m-panel"><i class="m-light"></i><i class="m-light b"></i></div><div class="m-logo">${iconPart(m.logo, 'emo')}</div></div>
+       <div class="m-nozzle"></div><div class="m-base"></div>
+       <div class="steam s1"></div><div class="steam s2"></div>
+       <div class="m-cup">${iconPart(m.icon, 'emo')}</div>`;
+}
+
+function applyCity() {
+  const c = cityOf(S.prestigeCount);
+  hall.style.setProperty('--wall1', c.wall[0]);
+  hall.style.setProperty('--wall2', c.wall[1]);
+  hall.style.setProperty('--floor1', c.floor[0]);
+  hall.style.setProperty('--floor2', c.floor[1]);
+  hall.style.setProperty('--sky1', c.sky[0]);
+  hall.style.setProperty('--sky2', c.sky[1]);
+  $('.wall').style.backgroundImage = c.bg ? `url("${c.bg}")` : '';
+  $('#cityIcon').innerHTML = renderIcon(c.icon);
+  $('#shelf').innerHTML = c.decor.map(d => iconPart(d, 'emo')).join('');
+  $('#signTitle').textContent = t('title');
+  $('#signCity').textContent = cityName(c);
+}
+
+const hallSprites = new Map();
+function renderHallCats() {
+  const want = [];
+  CONFIG.workers.forEach((w, i) => {
+    const c = S.workers[i];
+    if (!c) return;
+    const n = 1 + CONFIG.hall.extraAt.filter(m => c >= m).length;
+    for (let k = 0; k < n; k++) want.push({ key: i + '-' + k, i, k });
+  });
+  // Сначала по одному коту каждого вида, потом остальные
+  want.sort((a, b) => a.k - b.k || a.i - b.i);
+  want.length = Math.min(want.length, CONFIG.hall.maxSprites);
+  const keys = new Set(want.map(x => x.key));
+  for (const [key, el] of hallSprites) if (!keys.has(key)) { el.remove(); hallSprites.delete(key); }
+  const layer = $('#cats');
+  for (const x of want) {
+    if (hallSprites.has(x.key)) continue;
+    const rng = mulberry32((x.i + 1) * 7919 + x.k * 104729 + S.prestigeCount * 31);
+    let px = 50, py = 90;
+    for (let tries = 0; tries < 40; tries++) {
+      px = 5 + rng() * 90; py = 62 + rng() * 30;
+      if (!(px > 20 && px < 80 && py < 80)) break; // не ставим котов за стойку
+    }
+    const w = CONFIG.workers[x.i];
+    const el = document.createElement('div');
+    el.className = 'cat a' + (1 + Math.floor(rng() * 3)) + (Game.started ? ' pop' : '');
+    el.style.left = px.toFixed(1) + '%';
+    el.style.top = py.toFixed(1) + '%';
+    el.style.zIndex = String(Math.round(py));
+    el.style.setProperty('--s', (0.8 + (py - 62) / 30 * 0.35).toFixed(2));
+    el.innerHTML = `<span class="body">${renderIcon(w.icon, w.badge)}</span><span class="shadow"></span>`;
+    el.firstChild.style.animationDelay = (-rng() * 5).toFixed(2) + 's';
+    el.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      if (Game.paused) return;
+      Sound.play('meow');
+      spawnFx('fx-heart', e.clientX, e.clientY, '❤️');
+    });
+    if (Game.started) setTimeout(() => el.classList.remove('pop'), 600);
+    layer.appendChild(el);
+    hallSprites.set(x.key, el);
+  }
+}
+
+let fxCount = 0;
+function spawnFx(cls, clientX, clientY, html, vars) {
+  if (fxCount > 50) return;
+  const r = hall.getBoundingClientRect();
+  const el = document.createElement('div');
+  el.className = cls;
+  el.style.left = (clientX - r.left) + 'px';
+  el.style.top = (clientY - r.top) + 'px';
+  if (vars) for (const k in vars) el.style.setProperty(k, vars[k]);
+  el.innerHTML = html;
+  fxCount++;
+  const done = () => { if (el.parentNode) { el.remove(); fxCount--; } };
+  el.addEventListener('animationend', done);
+  setTimeout(done, 1500);
+  $('#fx').appendChild(el);
+}
+
+function tapMachine(clientX, clientY) {
+  if (Game.paused) return;
+  const v = tapValue();
+  earn(v);
+  S.stats.taps++;
+  const m = $('#machine');
+  m.animate([
+    { transform: 'translateX(-50%) scale(1, 1)' },
+    { transform: 'translateX(-50%) scale(1.06, .92)' },
+    { transform: 'translateX(-50%) scale(1, 1)' }
+  ], { duration: 130, easing: 'ease-out' });
+  const r = m.getBoundingClientRect();
+  const cupX = r.left + r.width / 2, cupY = r.top + r.height * 0.8;
+  const u = parseFloat(getComputedStyle(hall).getPropertyValue('--u')) || 4;
+  spawnFx('fx-cup', cupX, cupY, iconPart(CONFIG.machine.icon, 'emo'), {
+    '--dx': (rand(-1, 1) * u * 25).toFixed(0) + 'px',
+    '--dy': (-u * rand(14, 26)).toFixed(0) + 'px',
+    '--rot': rand(-200, 200).toFixed(0) + 'deg'
+  });
+  spawnFx('fx-num', clientX + rand(-10, 10), clientY - 10, '+' + fmt(v, true));
+  Sound.play('tap');
+}
+
+/* =====================================================================
+   РЕДКИЕ ГОСТИ
+   ===================================================================== */
+let guest = null; // { g, left, el }
+const RARITIES = ['common', 'rare', 'legendary'];
+
+function pickGuest(minRarity) {
+  const pool = RARITIES.slice(Math.max(0, RARITIES.indexOf(minRarity || 'common')));
+  const w = CONFIG.guests.rarityWeights;
+  let roll = Math.random() * pool.reduce((s, r) => s + w[r], 0);
+  let rarity = pool[pool.length - 1];
+  for (const r of pool) { if (roll < w[r]) { rarity = r; break; } roll -= w[r]; }
+  let list = CONFIG.guests.list.filter(g => g.rarity === rarity);
+  const unseen = list.filter(g => !S.guests[g.id]);
+  if (unseen.length && Math.random() < CONFIG.guests.preferNewChance) list = unseen;
+  return list[Math.floor(Math.random() * list.length)];
+}
+
+function spawnGuest(minRarity) {
+  if (guest) removeGuest(true);
+  const g = pickGuest(minRarity);
+  const el = document.createElement('div');
+  el.className = 'guest ' + g.rarity;
+  el.style.left = (Math.random() < 0.5 ? rand(10, 22) : rand(78, 90)).toFixed(1) + '%';
+  el.style.top = rand(68, 86).toFixed(1) + '%';
+  el.innerHTML = `<span class="body">${renderIcon(g.icon, g.badge)}</span><span class="spark">✨</span><span class="gtime"></span>`;
+  el.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); catchGuest(); });
+  $('#guestLayer').appendChild(el);
+  guest = { g, left: CONFIG.guests.stay, el };
+  S.guestTimer = rand(CONFIG.guests.minInterval, CONFIG.guests.maxInterval);
+  Sound.play('bell');
+  toast(t('guestArrived'), 'blue');
+}
+
+function removeGuest(silent) {
+  if (!guest) return;
+  const el = guest.el;
+  el.classList.add('leave');
+  setTimeout(() => el.remove(), 450);
+  guest = null;
+  if (!silent) toast(t('guestLeft'));
+}
+
+function catchGuest() {
+  if (!guest || Game.paused) return;
+  const g = guest.g;
+  const r = guest.el.getBoundingClientRect();
+  const isNew = !S.guests[g.id];
+  S.guests[g.id] = (S.guests[g.id] || 0) + 1;
+  S.stats.guestsCaught++;
+  guest.el.style.pointerEvents = 'none';
+  removeGuest(true);
+  if (isNew) recalc();
+  const name = t('guests.' + g.id);
+  // Бонус: доход за 5 минут или ×7 на 30 секунд (без сотрудников — всегда монеты)
+  if (D.baseCps > 0 && Math.random() < 0.5) {
+    S.frenzyLeft = CONFIG.guests.frenzyTime;
+    toast(t('guestFrenzy', { name }), 'gold');
+  } else {
+    const coins = Math.max(D.baseCps * CONFIG.guests.coinsSeconds, tapValue() * CONFIG.guests.minCoinsTaps);
+    earn(coins);
+    toast(t('guestCoins', { name, x: fmt(coins) }), 'gold');
+  }
+  if (isNew) { setTimeout(() => toast(t('guestNew'), 'blue'), 300); UI.newGuests++; }
+  spawnFx('fx-num', r.left + r.width / 2, r.top, renderIcon(g.icon, g.badge));
+  Sound.play('meow');
+  setTimeout(() => Sound.play('coin'), 200);
+  UI.dirty.collection = true;
+}
+
+/* =====================================================================
+   ПОКУПКИ
+   ===================================================================== */
+function buyWorker(i) {
+  if (Game.paused) return;
+  const n = buyAmount(i);
+  const cost = costFor(i, n);
+  if (S.coins < cost) { Sound.play('error'); return; }
+  S.coins -= cost;
+  S.workers[i] += n;
+  recalc();
+  renderHallCats();
+  Sound.play('buy');
+  UI.dirty.upgrades = true;
+}
+
+function upgradeVisible() {
+  // Сила тапа: две ближайшие некупленные. Сотрудники: доступные + следующий рубеж (заблокирован)
+  const res = [];
+  let tapShown = 0;
+  for (const u of CONFIG.upgrades) {
+    if (u.type !== 'tap' || S.upgrades[u.id]) continue;
+    if (tapShown++ < 2) res.push({ u, locked: false });
+  }
+  CONFIG.workers.forEach((w, i) => {
+    if (S.workers[i] <= 0) return;
+    let lockedShown = false;
+    for (const u of CONFIG.upgrades) {
+      if (u.type !== 'worker' || u.worker !== w.id || S.upgrades[u.id]) continue;
+      if (S.workers[i] >= u.need) res.push({ u, locked: false });
+      else if (!lockedShown) { res.push({ u, locked: true }); lockedShown = true; }
+    }
+  });
+  res.sort((a, b) => (a.locked - b.locked) || (a.u.cost - b.u.cost));
+  return res;
+}
+
+function buyUpgrade(id) {
+  if (Game.paused) return;
+  const u = CONFIG.upgrades.find(x => x.id === id);
+  if (!u || S.upgrades[id]) return;
+  if (u.type === 'worker' && S.workers[WORKER_INDEX[u.worker]] < u.need) return;
+  if (S.coins < u.cost) { Sound.play('error'); return; }
+  S.coins -= u.cost;
+  S.upgrades[id] = true;
+  S.stats.upgradesBought++;
+  recalc();
+  Sound.play('buy');
+  UI.dirty.upgrades = true;
+}
+
+/* =====================================================================
+   РЕКЛАМНЫЕ БОНУСЫ
+   ===================================================================== */
+function adRush() {
+  if (S.rushLeft > 0 || SDK.adActive) return;
+  SDK.showRewarded(() => {
+    S.rushLeft = CONFIG.ads.rushTime;
+    toast(t('rushStarted'), 'gold');
+    saveGame(false);
+  });
+}
+function adGuest() {
+  if (guest || SDK.adActive || Date.now() < S.guestCallAt) return;
+  SDK.showRewarded(() => {
+    S.guestCallAt = Date.now() + CONFIG.ads.guestCooldown * 1000;
+    spawnGuest();
+    saveGame(false);
+  });
+}
+
+/* =====================================================================
+   ПРЕСТИЖ
+   ===================================================================== */
+function askPrestige() {
+  const n = pendingStars();
+  if (n < 1 || SDK.adActive) return;
+  const next = cityOf(S.prestigeCount + 1);
+  Modal.show({
+    icon: renderIcon(next.icon),
+    title: t('prestigeConfirmTitle', { city: cityName(next) }),
+    html: `<p>${t('prestigeConfirmText', { n, b: Math.round((S.stars + n) * CONFIG.prestige.starBonus * 100) })}</p>`,
+    buttons: [
+      { text: t('confirm'), cls: 'primary', onClick: () => { doPrestige(); } },
+      { text: t('cancel') }
+    ]
+  });
+}
+
+function doPrestige() {
+  const n = pendingStars();
+  if (n < 1) return;
+  S.stars += n;
+  S.prestigeCount++;
+  S.coins = 0;
+  S.runEarned = 0;
+  S.workers = CONFIG.workers.map(() => 0);
+  S.revealed = 0;
+  S.upgrades = {};
+  recalc();
+  hall.classList.add('moving');
+  setTimeout(() => { applyCity(); renderHallCats(); hall.classList.remove('moving'); }, 400);
+  UI.dirty.cats = UI.dirty.upgrades = true;
+  checkAchievements();
+  saveGame(true);
+  const city = cityOf(S.prestigeCount);
+  // Межстраничная реклама при престиже, затем приветствие в новом городе
+  SDK.showFullscreen(() => {
+    Modal.show({
+      icon: renderIcon(city.icon),
+      title: t('welcomeCity', { city: cityName(city) }),
+      html: `<p>${t('welcomeCityText', { s: S.stars, b: Math.round(S.stars * CONFIG.prestige.starBonus * 100) })}</p>`
+    });
+  });
+}
+
+/* =====================================================================
+   ДОСТИЖЕНИЯ
+   ===================================================================== */
+function achStat(type) {
+  switch (type) {
+    case 'workers': return S.workers.reduce((a, b) => a + b, 0);
+    case 'taps': return S.stats.taps;
+    case 'earned': return S.allTimeEarned;
+    case 'cps': return D.baseCps;
+    case 'guests': return guestsFound();
+    case 'prestige': return S.prestigeCount;
+    case 'upgrades': return S.stats.upgradesBought;
+    case 'streak': return S.stats.bestStreak;
+  }
+  return 0;
+}
+const achReward = a => Math.max(a.reward, D.baseCps * CONFIG.achievementCpsSeconds);
+
+function checkAchievements() {
+  for (const a of CONFIG.achievements) {
+    if (S.achievements[a.id] || achStat(a.type) < a.n) continue;
+    S.achievements[a.id] = true;
+    const reward = achReward(a);
+    earn(reward, true);
+    toast(t('achUnlocked', { name: t('achievements.' + a.id)[0], x: fmt(reward) }), 'gold');
+    Sound.play('achieve');
+    UI.newAch++;
+    UI.dirty.achievements = true;
+  }
+}
+
+/* =====================================================================
+   ЕЖЕДНЕВНАЯ НАГРАДА
+   ===================================================================== */
+let dailyShown = '';
+function dailyReward(idx) {
+  const d = CONFIG.daily.days[idx];
+  return Math.max(d.coins, D.baseCps * d.cpsSec);
+}
+function checkDaily() {
+  const today = todayStr();
+  if (S.daily.last === today || dailyShown === today) return;
+  const y = new Date(); y.setDate(y.getDate() - 1);
+  const day = S.daily.last === todayStr(y) ? (S.daily.streak % CONFIG.daily.days.length) + 1 : 1;
+  dailyShown = today;
+  const cells = CONFIG.daily.days.map((d, i) => {
+    const n = i + 1;
+    const cls = n < day ? 'done' : (n === day ? 'today' : '');
+    return `<div class="dcell ${cls}"><div>${t('day', { n })}</div><div class="di">${d.guest ? '🎁' : CONFIG.coinIcon}</div><div class="da">${fmt(dailyReward(i))}</div>${d.guest ? `<div class="dg">+ ${t('dailyGuest')}</div>` : ''}</div>`;
+  }).join('');
+  Modal.show({
+    icon: '📅',
+    title: t('dailyTitle'),
+    html: `<p>${t('dailyText')}</p><div class="daily">${cells}</div>`,
+    buttons: [{ text: t('claim'), cls: 'primary', onClick: () => { claimDaily(day); } }]
+  });
+}
+function claimDaily(day) {
+  const today = todayStr();
+  if (S.daily.last === today) return;
+  S.daily.last = today;
+  S.daily.streak = day;
+  S.stats.bestStreak = Math.max(S.stats.bestStreak, day);
+  const coins = dailyReward(day - 1);
+  earn(coins, true);
+  toast(t('dailyClaimed', { x: fmt(coins) }), 'gold');
+  Sound.play('coin');
+  // 7-й день — гарантированный редкий (или легендарный) гость
+  if (CONFIG.daily.days[day - 1].guest) setTimeout(() => spawnGuest('rare'), 600);
+  checkAchievements();
+  saveGame(true);
+}
+
+/* =====================================================================
+   ОФЛАЙН-ДОХОД
+   ===================================================================== */
+function offlineEarnings(sec) {
+  return D.baseCps * Math.min(sec, CONFIG.offline.maxSeconds) * CONFIG.offline.rate;
+}
+function showOffline(sec, amount) {
+  let done = false;
+  const o = {
+    icon: '😴',
+    title: t('offlineTitle'),
+    html: `<p>${t('offlineText', { time: fmtDuration(Math.min(sec, CONFIG.offline.maxSeconds)) })}</p><div class="big-amount">${CONFIG.coinIcon} ${fmt(amount)}</div>`,
+    buttons: [
+      {
+        text: t('triple', { x: fmt(amount * CONFIG.ads.offlineMult) }), cls: 'ad',
+        onClick: () => {
+          SDK.showRewarded(() => {
+            if (done) return;
+            done = true;
+            earn(amount * CONFIG.ads.offlineMult);
+            Sound.play('coin');
+            Modal.closeIf(o);
+          });
+          return true; // окно остаётся открытым, пока реклама не досмотрена
+        }
+      },
+      { text: t('collect', { x: fmt(amount) }), cls: 'primary', onClick: () => { if (!done) { done = true; earn(amount); Sound.play('coin'); } } }
+    ]
+  };
+  Modal.show(o);
+}
+
+// Возврат в игру после сворачивания вкладки
+let hiddenAt = 0;
+function handleReturn() {
+  if (!hiddenAt) return;
+  const sec = (Date.now() - hiddenAt) / 1000;
+  hiddenAt = 0;
+  const amount = offlineEarnings(sec);
+  if (sec >= CONFIG.offline.minSeconds && !SDK.adActive) {
+    SDK.showFullscreen(() => {
+      if (amount > 0) showOffline(sec, amount);
+      checkDaily();
+    });
+  } else {
+    earn(amount);
+  }
+}
+
+/* =====================================================================
+   СОХРАНЕНИЕ
+   ===================================================================== */
+function saveGame(flush) {
+  S.savedAt = Date.now();
+  SDK.save(JSON.parse(JSON.stringify(S)), flush);
+}
+
+/* =====================================================================
+   ПАНЕЛИ (вкладки)
+   ===================================================================== */
+const UI = {
+  tab: 'cats',
+  dirty: { cats: true, upgrades: true, collection: true, achievements: true },
+  keys: {},
+  newAch: 0, newGuests: 0,
+  refs: {}
+};
+const setText = (el, s) => { if (el && el.textContent !== s) el.textContent = s; };
+const setHTML = (el, s) => { if (el && el.innerHTML !== s) el.innerHTML = s; };
+
+function switchTab(tab) {
+  UI.tab = tab;
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.tab-page').forEach(p => p.classList.toggle('active', p.id === 'page-' + tab));
+  if (tab === 'achievements') UI.newAch = 0;
+  if (tab === 'collection') UI.newGuests = 0;
+  try { localStorage.setItem('catcafe_tab', tab); } catch (e) {}
+  refreshPanel(true);
+}
+
+/* --- Коты --- */
+function buildCats() {
+  const p = $('#page-cats');
+  let html = `<div class="seg">${[1, 10, 'max'].map(m => `<button data-mode="${m}">${m === 'max' ? t('buyMax') : 'x' + m}</button>`).join('')}</div><div class="list">`;
+  for (let i = 0; i < CONFIG.workers.length; i++) {
+    const w = CONFIG.workers[i];
+    if (i < S.revealed) {
+      html += `<div class="row" id="w${i}">
+        <div class="ricon">${renderIcon(w.icon, w.badge)}</div>
+        <div class="rinfo"><div class="rname">${workerName(i)}<span class="cnt"></span></div><div class="rsub"></div></div>
+        <button class="buy" data-buy="${i}"><small></small><span></span></button></div>`;
+    } else {
+      html += `<div class="row locked" id="w${i}">
+        <div class="ricon">${renderIcon(w.icon, w.badge, 'sil')}</div>
+        <div class="rinfo"><div class="rname">${t('unknownWorker')}</div><div class="rsub">${t('revealAt', { x: CONFIG.coinIcon + ' ' + fmt(costFor(i, 1) * CONFIG.revealFraction) })}</div></div></div>`;
+      break;
+    }
+  }
+  p.innerHTML = html + '</div>';
+  UI.refs.cats = [];
+  for (let i = 0; i < S.revealed; i++) {
+    const row = $('#w' + i, p);
+    UI.refs.cats[i] = { cnt: $('.cnt', row), sub: $('.rsub', row), btn: $('.buy', row), q: $('.buy small', row), c: $('.buy span', row) };
+  }
+}
+function updateCats() {
+  document.querySelectorAll('#page-cats .seg button').forEach(b => b.classList.toggle('on', String(S.buyMode) === b.dataset.mode));
+  for (let i = 0; i < S.revealed; i++) {
+    const r = UI.refs.cats[i];
+    if (!r) continue;
+    const n = buyAmount(i), cost = costFor(i, n), unit = workerUnitIncome(i);
+    setText(r.cnt, S.workers[i] ? ' ×' + S.workers[i] : '');
+    setText(r.sub, t('perCat', { x: fmt(unit, true) }) + (S.workers[i] ? ' · ' + t('totalIncome', { x: fmt(unit * S.workers[i], true) }) : ''));
+    setText(r.q, 'x' + n);
+    setText(r.c, CONFIG.coinIcon + ' ' + fmt(Math.ceil(cost)));
+    r.btn.disabled = S.coins < cost;
+  }
+}
+
+/* --- Улучшения и престиж --- */
+function buildUpgrades() {
+  const p = $('#page-upgrades');
+  const vis = upgradeVisible();
+  UI.keys.upgradesList = vis.map(x => x.u.id + (x.locked ? 'L' : '')).join(',');
+  let html = `<div class="prestige">
+      <h3>${t('prestigeTitle')}</h3>
+      <div class="pline" id="pStars"></div>
+      <div class="pline" id="pEarned"></div>
+      <div class="pline pgain" id="pGain"></div>
+      <button class="buy" id="pBtn" ${pendingStars() < 1 ? 'disabled' : ''}></button>
+    </div>
+    <div class="sec-title">${t('upgradesTitle')} · <span id="tapNow"></span></div><div class="list">`;
+  if (!vis.length) html += `<div class="hint">${t('noUpgrades')}</div>`;
+  for (const { u, locked } of vis) {
+    const isTap = u.type === 'tap';
+    const wi = isTap ? -1 : WORKER_INDEX[u.worker];
+    const icon = isTap ? renderIcon(u.icon, CONFIG.machine.icon) : renderIcon(u.icon, CONFIG.workers[wi].icon);
+    const desc = locked
+      ? t('needWorkers', { n: u.need, name: workerName(wi), have: S.workers[wi] })
+      : (isTap ? t('tapUpDesc') : t('workerUpDesc', { name: workerName(wi) }));
+    html += `<div class="row ${locked ? 'locked' : ''}">
+      <div class="ricon">${icon}</div>
+      <div class="rinfo"><div class="rname">${t('upgrades.' + u.id)}</div><div class="rsub">${desc}</div></div>
+      <button class="buy" data-up="${u.id}" ${locked ? 'disabled' : ''}>${CONFIG.coinIcon} ${fmt(u.cost)}</button></div>`;
+  }
+  p.innerHTML = html + '</div>';
+  UI.refs.up = {
+    stars: $('#pStars'), earned: $('#pEarned'), gain: $('#pGain'), btn: $('#pBtn'), tapNow: $('#tapNow'),
+    buttons: [...p.querySelectorAll('[data-up]')].filter(b => !b.closest('.locked'))
+  };
+}
+function updateUpgrades() {
+  const key = upgradeVisible().map(x => x.u.id + (x.locked ? 'L' : '')).join(',');
+  if (key !== UI.keys.upgradesList) buildUpgrades();
+  const r = UI.refs.up;
+  const n = pendingStars();
+  setText(r.stars, t('prestigeStars', { s: S.stars, b: Math.round(S.stars * CONFIG.prestige.starBonus * 100) }));
+  setText(r.earned, t('prestigeEarned', { x: fmt(S.runEarned) }));
+  const nextAt = Math.pow(n + 1, 2) * CONFIG.prestige.starDivisor;
+  setText(r.gain, n >= 1 ? t('prestigeGain', { n }) + ' · ' + t('prestigeNext', { x: fmt(nextAt) }) : t('prestigeFirst', { x: fmt(nextAt) }));
+  setText(r.btn, t('prestigeBtn', { city: cityName(cityOf(S.prestigeCount + 1)) }));
+  r.btn.disabled = n < 1;
+  setText(r.tapNow, t('tapNow', { x: fmt(tapValue(), true) }));
+  for (const b of r.buttons) {
+    const u = CONFIG.upgrades.find(x => x.id === b.dataset.up);
+    b.disabled = S.coins < u.cost;
+  }
+}
+
+/* --- Коллекция --- */
+function buildCollection() {
+  const p = $('#page-collection');
+  const found = guestsFound(), total = CONFIG.guests.list.length;
+  let html = `<div class="col-head">${t('collectionHead', { n: found, total, b: Math.round(found * CONFIG.guests.collectionBonus * 100) })}</div>`;
+  for (const rar of RARITIES) {
+    html += `<div class="sec-title rar-${rar}">${t('rarity_' + rar)}</div><div class="grid">`;
+    for (const g of CONFIG.guests.list.filter(x => x.rarity === rar)) {
+      const c = S.guests[g.id] || 0;
+      html += c
+        ? `<div class="gcard ${rar}"><div class="gi">${renderIcon(g.icon, g.badge)}</div><div class="gn">${t('guests.' + g.id)}</div><div class="gc">${t('caught', { n: c })}</div></div>`
+        : `<div class="gcard unknown"><div class="gi">${renderIcon(g.icon, g.badge, 'sil')}</div><div class="gn">???</div><div class="gc">&nbsp;</div></div>`;
+    }
+    html += '</div>';
+  }
+  p.innerHTML = html + `<div class="hint">${t('collectionHint')}</div>`;
+}
+
+/* --- Достижения --- */
+function buildAchievements() {
+  const p = $('#page-achievements');
+  const got = CONFIG.achievements.filter(a => S.achievements[a.id]).length;
+  let html = `<div class="col-head">${t('achHead', { n: got, total: CONFIG.achievements.length })}</div><div class="list">`;
+  for (const a of CONFIG.achievements) {
+    const done = !!S.achievements[a.id];
+    const [name, desc] = t('achievements.' + a.id);
+    html += `<div class="row ach ${done ? 'done' : 'locked'}" data-ach="${a.id}">
+      <div class="ricon">${iconPart(a.icon, 'emo')}</div>
+      <div class="rinfo"><div class="rname">${done ? '✔ ' : ''}${name}</div><div class="rsub">${desc}</div>${done ? '' : '<div class="bar"><i></i></div>'}</div>
+      <div class="rew"></div></div>`;
+  }
+  p.innerHTML = html + '</div>';
+  UI.refs.ach = [...p.querySelectorAll('[data-ach]')].map(el => ({
+    a: CONFIG.achievements.find(x => x.id === el.dataset.ach), bar: $('.bar i', el), rew: $('.rew', el)
+  }));
+}
+function updateAchievements() {
+  for (const r of UI.refs.ach || []) {
+    const done = !!S.achievements[r.a.id];
+    setText(r.rew, done ? '🏆' : t('achReward', { x: fmt(achReward(r.a)) }));
+    if (r.bar) {
+      const pct = Math.min(100, achStat(r.a.type) / r.a.n * 100);
+      const w = pct.toFixed(1) + '%';
+      if (r.bar.style.width !== w) r.bar.style.width = w;
+    }
+  }
+}
+
+function refreshPanel(force) {
+  // Перестраиваем вкладки при изменении структуры
+  const catsKey = S.revealed + '|' + LANG;
+  if (UI.keys.cats !== catsKey || UI.dirty.cats) { UI.keys.cats = catsKey; UI.dirty.cats = false; buildCats(); }
+  if (UI.dirty.upgrades) { UI.dirty.upgrades = false; buildUpgrades(); }
+  if (UI.dirty.collection) { UI.dirty.collection = false; buildCollection(); }
+  if (UI.dirty.achievements) { UI.dirty.achievements = false; buildAchievements(); }
+  if (UI.tab === 'cats') updateCats();
+  if (UI.tab === 'upgrades') updateUpgrades();
+  if (UI.tab === 'achievements') updateAchievements();
+  if (force) { updateCats(); updateUpgrades(); updateAchievements(); }
+
+  // Точки на вкладках
+  const dots = {};
+  dots.cats = CONFIG.workers.some((w, i) => i < S.revealed && S.coins >= costFor(i, 1)) && UI.tab !== 'cats';
+  dots.upgrades = UI.tab !== 'upgrades' && (pendingStars() >= 1 ||
+    upgradeVisible().some(x => !x.locked && S.coins >= x.u.cost));
+  dots.collection = UI.newGuests > 0 && UI.tab !== 'collection';
+  dots.achievements = UI.newAch > 0 && UI.tab !== 'achievements';
+  document.querySelectorAll('#tabs button').forEach(b => b.querySelector('.dot').classList.toggle('on', !!dots[b.dataset.tab]));
+
+  // Кнопки зала
+  const rush = $('#rushBtn');
+  if (S.rushLeft > 0) { setText(rush, t('rushActive', { t: fmtClock(S.rushLeft) })); rush.disabled = true; rush.classList.add('active'); }
+  else { setText(rush, t('rushBtn')); rush.disabled = SDK.adActive; rush.classList.remove('active'); }
+  const gb = $('#guestBtn');
+  const wait = (S.guestCallAt - Date.now()) / 1000;
+  if (guest) { setText(gb, t('guestHereBtn')); gb.disabled = true; }
+  else if (wait > 0) { setText(gb, t('guestWait', { t: fmtClock(wait) })); gb.disabled = true; }
+  else { setText(gb, t('guestBtn')); gb.disabled = SDK.adActive; }
+
+  // Индикаторы бустов
+  let bh = '';
+  if (S.frenzyLeft > 0) bh += `<div class="boost frenzy">${t('frenzy', { t: fmtClock(S.frenzyLeft) })}</div>`;
+  setHTML($('#boosts'), bh);
+
+  // Звёзды в шапке
+  setText($('#stars'), String(S.stars));
+  $('#starsChip').classList.toggle('glow', pendingStars() >= 1);
+  setText($('#soundBtn'), S.muted ? '🔇' : '🔊');
+}
+
+function renderTop() {
+  setText($('#coins'), fmt(S.coins));
+  const c = cps();
+  setText($('#cps'), t('perSec', { x: fmt(c, true) }));
+  $('#cps').classList.toggle('boosted', boostMult() > 1);
+}
+
+/* =====================================================================
+   ИГРОВОЙ ЦИКЛ
+   ===================================================================== */
+let lastFrame = performance.now();
+let uiTimer = 0, slowTimer = 0;
+
+function update(dt) {
+  // Таймеры бустов идут только в игровом времени (на паузе стоят)
+  const rushBefore = S.rushLeft > 0, frenzyBefore = S.frenzyLeft > 0;
+  earn(cps() * dt);
+  S.rushLeft = Math.max(0, S.rushLeft - dt);
+  S.frenzyLeft = Math.max(0, S.frenzyLeft - dt);
+  if ((rushBefore && !S.rushLeft) || (frenzyBefore && !S.frenzyLeft)) UI.dirty.upgrades = true;
+
+  // Гости
+  if (guest) {
+    guest.left -= dt;
+    setText($('.gtime', guest.el), Math.ceil(Math.max(0, guest.left)) + '');
+    if (guest.left <= 0) removeGuest(false);
+  } else {
+    S.guestTimer -= dt;
+    if (S.guestTimer <= 0) spawnGuest();
+  }
+
+  // Открытие следующего сотрудника (силуэт → карточка)
+  while (S.revealed < CONFIG.workers.length) {
+    const i = S.revealed;
+    if (S.workers[i] > 0 || S.coins >= costFor(i, 1) * CONFIG.revealFraction) {
+      S.revealed++;
+      if (Game.started && i > 0) toast(t('newWorker', { name: workerName(i) }));
+    } else break;
+  }
+
+  slowTimer += dt;
+  if (slowTimer >= 1) {
+    slowTimer = 0;
+    checkAchievements();
+    if (!Modal.current) checkDaily();
+  }
+}
+
+function frame(now) {
+  let dt = (now - lastFrame) / 1000;
+  lastFrame = now;
+  if (dt < 0) dt = 0;
+  if (dt > 5) dt = 5;
+  if (!Game.paused) update(dt);
+  renderTop();
+  uiTimer += dt;
+  if (uiTimer >= 0.2) { uiTimer = 0; refreshPanel(false); }
+  requestAnimationFrame(frame);
+}
+
+/* =====================================================================
+   СОБЫТИЯ
+   ===================================================================== */
+function bindEvents() {
+  const machine = $('#machine');
+  machine.addEventListener('pointerdown', e => { e.preventDefault(); tapMachine(e.clientX, e.clientY); });
+  document.addEventListener('keydown', e => {
+    if ((e.code === 'Space' || e.code === 'Enter') && !Modal.current && !e.repeat) {
+      e.preventDefault();
+      const r = machine.getBoundingClientRect();
+      tapMachine(r.left + r.width / 2, r.top + r.height * 0.3);
+    }
+  });
+
+  $('#tabs').addEventListener('click', e => {
+    const b = e.target.closest('button[data-tab]');
+    if (b) { Sound.play('click'); switchTab(b.dataset.tab); }
+  });
+  $('#page-cats').addEventListener('click', e => {
+    const m = e.target.closest('[data-mode]');
+    if (m) { S.buyMode = m.dataset.mode === 'max' ? 'max' : +m.dataset.mode; Sound.play('click'); updateCats(); return; }
+    const b = e.target.closest('[data-buy]');
+    if (b && !b.disabled) { buyWorker(+b.dataset.buy); updateCats(); }
+  });
+  $('#page-upgrades').addEventListener('click', e => {
+    if (e.target.closest('#pBtn')) { askPrestige(); return; }
+    const b = e.target.closest('[data-up]');
+    if (b && !b.disabled) buyUpgrade(b.dataset.up);
+  });
+  $('#rushBtn').addEventListener('click', adRush);
+  $('#guestBtn').addEventListener('click', adGuest);
+  $('#starsChip').addEventListener('click', () => { switchTab('upgrades'); $('#page-upgrades').scrollTop = 0; });
+  $('#soundBtn').addEventListener('click', () => {
+    S.muted = !S.muted;
+    if (S.muted) Sound.suspend(); else { Sound.unlock(); Sound.play('click'); }
+    refreshPanel(false);
+  });
+
+  // Разблокировка звука первым касанием (требование браузеров)
+  document.addEventListener('pointerdown', () => Sound.unlock(), { capture: true });
+
+  // Без контекстного меню, выделения, перетаскивания и масштабирования
+  document.addEventListener('contextmenu', e => e.preventDefault());
+  document.addEventListener('selectstart', e => e.preventDefault());
+  document.addEventListener('dragstart', e => e.preventDefault());
+  document.addEventListener('gesturestart', e => e.preventDefault());
+  document.addEventListener('dblclick', e => e.preventDefault());
+  document.addEventListener('touchmove', e => { if (!e.target.closest('.tab-page, .mcard')) e.preventDefault(); }, { passive: false });
+
+  // Сворачивание вкладки: пауза, звук off, сохранение
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      hiddenAt = Date.now();
+      Game.pause('hidden');
+      saveGame(true);
+    } else {
+      Game.resume('hidden');
+      handleReturn();
+    }
+  });
+  window.addEventListener('pagehide', () => saveGame(true));
+  window.addEventListener('resize', resizeHall);
+  if (window.ResizeObserver) new ResizeObserver(resizeHall).observe(hall);
+
+  setInterval(() => { if (!document.hidden) saveGame(false); }, CONFIG.autosaveSeconds * 1000);
+}
+
+/* =====================================================================
+   ЗАПУСК
+   ===================================================================== */
+async function boot() {
+  await SDK.init();
+  document.documentElement.lang = LANG;
+  document.title = t('title');
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+  $('#coinIco').innerHTML = iconPart(CONFIG.coinIcon, 'emo');
+  $('#starIco').innerHTML = iconPart(CONFIG.starIcon, 'emo');
+
+  const saved = await SDK.load();
+  S = normalizeState(saved);
+  recalc();
+
+  resizeHall();
+  renderMachine();
+  applyCity();
+  renderHallCats();
+  bindEvents();
+  let startTab = 'cats';
+  try { startTab = localStorage.getItem('catcafe_tab') || 'cats'; } catch (e) {}
+  switchTab(['cats', 'upgrades', 'collection', 'achievements'].includes(startTab) ? startTab : 'cats');
+  renderTop();
+
+  if (location.search.includes('debug')) window.CatCafe = { get S() { return S; }, recalc, spawnGuest, earn, saveGame, doPrestige };
+
+  Game.started = true;
+  lastFrame = performance.now();
+  requestAnimationFrame(frame);
+  SDK.ready();
+  if (!Game.paused) SDK.gameplay(true);
+
+  // Офлайн-доход при запуске
+  const sec = saved && S.savedAt ? (Date.now() - S.savedAt) / 1000 : 0;
+  const amount = offlineEarnings(sec);
+  if (sec >= CONFIG.offline.minSeconds && amount > 0) {
+    SDK.showFullscreen(() => { showOffline(sec, amount); checkDaily(); });
+  } else {
+    if (amount > 0) earn(amount);
+    checkDaily();
+  }
+}
+
+boot();
+</script>
+</body>
+</html>
