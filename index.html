@@ -127,18 +127,51 @@ img { -webkit-user-drag: none; user-select: none; }
 .steam { position: absolute; bottom: 52%; width: calc(var(--u) * 1.4); height: calc(var(--u) * 6); border-radius: 50%; background: rgba(255,255,255,.8); filter: blur(1px); opacity: 0; animation: steam 2.4s infinite; pointer-events: none; }
 .steam.s1 { left: 38%; } .steam.s2 { left: 46%; animation-delay: 1.2s; }
 
-/* --- Коты в зале --- */
+/* --- Коты в зале: один кот на профессию, ходит по залу (позиция задаётся из JS) --- */
 #cats { position: absolute; inset: 0; pointer-events: none; }
-.cat {
-  position: absolute; transform: translate(-50%, -100%) scale(var(--s, 1));
-  font-size: calc(var(--u) * 20); line-height: 1; pointer-events: auto; cursor: pointer;
+.cat, .guest {
+  position: absolute; left: 0; top: 0; transform-origin: 50% 100%;
+  line-height: 1; pointer-events: auto; cursor: pointer; will-change: transform;
 }
-.cat .body { display: block; transform-origin: 50% 100%; filter: drop-shadow(0 2px 2px rgba(0,0,0,.3)); }
-.cat.a1 .body { animation: bob 1.8s ease-in-out infinite; }
-.cat.a2 .body { animation: sway 2.6s ease-in-out infinite; }
-.cat.a3 .body { animation: walk 7s ease-in-out infinite; }
-.cat .shadow { position: absolute; left: 18%; right: 18%; bottom: -3%; height: 8%; border-radius: 50%; background: rgba(0,0,0,.28); z-index: -1; }
-.cat.pop .body { animation: pop .5s ease-out; }
+.cat { font-size: calc(var(--u) * 18); }
+.cat .body, .guest .body {
+  display: block; transform-origin: 50% 100%;
+  filter: drop-shadow(0 2px 2px rgba(0,0,0,.3));
+  animation: breathe 2.6s ease-in-out infinite;
+}
+.cat.walking .body, .guest.walking .body { animation: hop .38s ease-in-out infinite; }
+.cat .flip, .guest .flip { transition: transform .15s; }
+/* Кольцо под лапами: цвет = уровень кота (10, 25, 50, 100 штук) */
+.cat .ring {
+  position: absolute; left: 14%; right: 14%; bottom: -3%; height: 11%;
+  border-radius: 50%; background: rgba(0,0,0,.28); z-index: -1;
+}
+.cat[data-tier="1"] .ring { background: rgba(205,127,50,.55); box-shadow: 0 0 0 2px #cd7f32; }
+.cat[data-tier="2"] .ring { background: rgba(220,230,240,.6); box-shadow: 0 0 0 2px #b0bec5, 0 0 10px #eceff1; }
+.cat[data-tier="3"] .ring { background: rgba(255,213,79,.6); box-shadow: 0 0 0 3px #ffc107, 0 0 16px #ffd54f; }
+.cat[data-tier="4"] .ring {
+  background: conic-gradient(#ff5e5e, #ffd84d, #5ee07a, #4dc3ff, #b36bff, #ff5e5e);
+  box-shadow: 0 0 18px #fff6b0; animation: pulse 1.6s infinite;
+}
+.cat .badge {
+  position: absolute; left: 50%; top: -4%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 1px;
+  font-size: max(9px, calc(var(--u) * 1.9)); font-weight: 800; color: var(--ink);
+  background: rgba(255,255,255,.92); border-radius: 999px; padding: 1px 6px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.2); white-space: nowrap; pointer-events: none;
+}
+.cat .badge img { width: 1.1em; height: 1.1em; margin-right: -2px; }
+.cat .badge img:last-of-type { margin-right: 2px; }
+.bubble {
+  position: absolute; left: 50%; bottom: 104%;
+  transform: translate(-50%, 6px) scale(.6); opacity: 0;
+  transition: opacity .2s, transform .2s;
+  background: #fff; color: var(--ink); border-radius: 10px; padding: 3px 9px;
+  font-size: max(10px, calc(var(--u) * 2.1)); font-weight: 800; white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(0,0,0,.2); pointer-events: none;
+}
+.bubble::after { content: ""; position: absolute; left: 50%; top: 100%; transform: translateX(-50%); border: 5px solid transparent; border-top-color: #fff; }
+.bubble.show { opacity: 1; transform: translate(-50%, 0) scale(1); }
 
 /* --- Иконки: картинка (или эмодзи) + значок --- */
 .ic { position: relative; display: inline-block; line-height: 1; vertical-align: middle; }
@@ -150,14 +183,9 @@ img.ci { width: 1.15em; height: 1.15em; vertical-align: -.25em; object-fit: cont
 .sil { filter: brightness(0); opacity: .35; }
 svg.ui { width: 1.1em; height: 1.1em; vertical-align: -.2em; fill: currentColor; }
 
-/* --- Редкий гость --- */
+/* --- Редкий гость (тоже ходит, позиция из JS) --- */
 #guestLayer { position: absolute; inset: 0; pointer-events: none; z-index: 200; }
-.guest {
-  position: absolute; transform: translate(-50%, -100%);
-  font-size: calc(var(--u) * 22); line-height: 1; pointer-events: auto; cursor: pointer;
-  animation: guestIn .5s ease-out;
-}
-.guest .body { display: block; animation: bob 1s ease-in-out infinite; }
+.guest { font-size: calc(var(--u) * 20); }
 .guest::before {
   content: ""; position: absolute; left: 50%; top: 55%; width: 130%; aspect-ratio: 1;
   transform: translate(-50%, -50%); border-radius: 50%;
@@ -167,8 +195,7 @@ svg.ui { width: 1.1em; height: 1.1em; vertical-align: -.2em; fill: currentColor;
 .guest.rare::before { background: radial-gradient(rgba(120,180,255,.95), rgba(120,180,255,0) 65%); }
 .guest.legendary::before { background: radial-gradient(rgba(255,210,80,1), rgba(255,210,80,0) 65%); }
 .guest .spark { position: absolute; top: -6%; right: -12%; width: .3em; height: .3em; animation: spin 2s linear infinite; }
-.guest .gtime { position: absolute; left: 50%; top: -14%; transform: translateX(-50%); font-size: .14em; font-weight: 800; background: #fff; border-radius: 999px; padding: 1px 6px; box-shadow: 0 1px 3px rgba(0,0,0,.2); white-space: nowrap; }
-.guest.leave { animation: guestOut .4s ease-in forwards; }
+.guest .gtime { position: absolute; left: 50%; top: -14%; transform: translateX(-50%); font-size: max(11px, .14em); font-weight: 800; background: #fff; border-radius: 999px; padding: 1px 6px; box-shadow: 0 1px 3px rgba(0,0,0,.2); white-space: nowrap; }
 
 /* --- Эффекты тапа --- */
 #fx { position: absolute; inset: 0; pointer-events: none; z-index: 300; overflow: hidden; }
@@ -179,6 +206,7 @@ svg.ui { width: 1.1em; height: 1.1em; vertical-align: -.2em; fill: currentColor;
   animation: floatUp .9s ease-out forwards; white-space: nowrap;
 }
 .fx-num .ic { font-size: calc(var(--u) * 12); }
+.fx-num.deliver { font-size: clamp(12px, calc(var(--u) * 3.4), 20px); animation-duration: 1.3s; }
 .fx-cup { position: absolute; font-size: calc(var(--u) * 7); transform: translate(-50%, -50%); animation: cupFly .9s ease-out forwards; }
 .fx-heart { position: absolute; transform: translate(-50%, -50%); font-size: calc(var(--u) * 5); animation: floatUp 1s ease-out forwards; }
 .fx-cup img, .fx-heart img { width: 1em; height: 1em; display: block; }
@@ -250,6 +278,8 @@ svg.ui { width: 1.1em; height: 1.1em; vertical-align: -.2em; fill: currentColor;
 .row .rinfo { flex: 1; min-width: 0; }
 .row .rname { font-weight: 800; line-height: 1.2; }
 .row .rname .cnt { color: var(--accent-dark); margin-left: 4px; }
+.row .rname .tier { margin-left: 4px; white-space: nowrap; }
+.row .rname .tier img { width: 1em; height: 1em; vertical-align: -.12em; }
 .row .rsub { color: var(--muted); font-size: .88em; line-height: 1.25; margin-top: 2px; }
 .row.locked { opacity: .7; }
 .buy {
@@ -336,14 +366,8 @@ svg.ui { width: 1.1em; height: 1.1em; vertical-align: -.2em; fill: currentColor;
 #adStub .mcard { background: #222; color: #fff; }
 
 /* ===================== АНИМАЦИИ ===================== */
-@keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8%); } }
-@keyframes sway { 0%,100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg); } }
-@keyframes walk {
-  0% { transform: translateX(0) scaleX(1); } 45% { transform: translateX(60%) scaleX(1); }
-  50% { transform: translateX(60%) scaleX(-1); } 95% { transform: translateX(-30%) scaleX(-1); }
-  100% { transform: translateX(0) scaleX(1); }
-}
-@keyframes pop { 0% { transform: scale(0); } 70% { transform: scale(1.25); } 100% { transform: scale(1); } }
+@keyframes hop { 0%,100% { transform: translateY(0) rotate(-4deg); } 50% { transform: translateY(-7%) rotate(4deg); } }
+@keyframes breathe { 0%,100% { transform: scaleY(1); } 50% { transform: scaleY(.97); } }
 @keyframes popIn { from { transform: scale(.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 @keyframes floatUp { from { opacity: 1; margin-top: 0; } to { opacity: 0; margin-top: calc(var(--u) * -18); } }
 @keyframes cupFly {
@@ -355,12 +379,10 @@ svg.ui { width: 1.1em; height: 1.1em; vertical-align: -.2em; fill: currentColor;
 @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.06); } }
 @keyframes glow { 0%,100% { opacity: .7; transform: translate(-50%,-50%) scale(.9); } 50% { opacity: 1; transform: translate(-50%,-50%) scale(1.1); } }
 @keyframes spin { to { transform: rotate(360deg); } }
-@keyframes guestIn { from { opacity: 0; transform: translate(-50%, -60%) scale(.3); } to { opacity: 1; transform: translate(-50%, -100%) scale(1); } }
-@keyframes guestOut { to { opacity: 0; transform: translate(-50%, -140%) scale(.4); } }
 @keyframes toastIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
 @keyframes toastOut { to { opacity: 0; transform: translateY(-10px); } }
 @media (prefers-reduced-motion: reduce) {
-  .cat .body, .guest .body, .steam { animation: none !important; }
+  .cat .body, .guest .body, .steam, .cat .ring { animation: none !important; }
 }
 </style>
 </head>
@@ -446,7 +468,13 @@ const CONFIG = {
   machine: { icon: IMG + 'machine.webp' },
 
   // Зал: сколько фигурок кота показывать (1 + по одной за каждый рубеж)
-  hall: { extraAt: [10, 25, 50, 100], maxSprites: 16 },
+  // Зал: один кот на профессию. Уровень кота растёт на рубежах tiers (×1, ×10, ×25...)
+  hall: {
+    tiers: [10, 25, 50, 100],   // на этих количествах кот получает ★ и становится крупнее
+    tierScale: 0.08,            // +8% размера за каждый уровень
+    walkSpeed: 11,              // скорость ходьбы (в единицах зала в секунду)
+    floor: { y0: 0.62, y1: 0.93 } // где по высоте зала может стоять кот (доли)
+  },
 
   // Сотрудники
   workers: [
@@ -653,6 +681,15 @@ const I18N = {
     adStub: 'Реклама (заглушка)',
     adStubRewarded: 'Видео за награду', adStubFullscreen: 'Межстраничная реклама',
     newWorker: 'Новый сотрудник ищет работу: {name}!',
+    tierUp: 'Повышение! {name} — уровень {n}',
+    phrases: {
+      hello: ['Всем мяу!', 'Я на смену!', 'Привет, кафе!'],
+      greet: ['Привет!', 'Мур!', 'Как смена?', 'Пять лап!', 'Видел гостя?'],
+      reply: ['Мяу!', 'Отлично!', 'Мурр~', 'Работаем!', 'Ещё бы!'],
+      idle: ['Кофе готов!', 'Ещё латте?', 'Свежая выпечка!', 'Мурр~', 'Улыбнитесь!'],
+      pet: ['Мур!', 'Ещё!', 'Мяу?', 'Приятно!', 'Мурррр'],
+      levelUp: 'Я теперь звезда!'
+    },
     ok: 'Отлично!',
     hours: '{h} ч {m} мин', minutes: '{m} мин', seconds: '{s} с',
     workers: {
@@ -750,6 +787,15 @@ const I18N = {
     adStub: 'Advertisement (stub)',
     adStubRewarded: 'Rewarded video', adStubFullscreen: 'Interstitial ad',
     newWorker: 'A new worker wants a job: {name}!',
+    tierUp: 'Promotion! {name} — level {n}',
+    phrases: {
+      hello: ['Meow, everyone!', 'Shift started!', 'Hi, café!'],
+      greet: ['Hi!', 'Purr!', 'How\'s the shift?', 'High paw!', 'Seen a guest?'],
+      reply: ['Meow!', 'Great!', 'Purrr~', 'Busy!', 'You bet!'],
+      idle: ['Coffee\'s ready!', 'More latte?', 'Fresh pastries!', 'Purrr~', 'Smile!'],
+      pet: ['Purr!', 'More!', 'Meow?', 'Nice!', 'Purrrr'],
+      levelUp: 'I\'m a star now!'
+    },
     ok: 'Great!',
     hours: '{h}h {m}m', minutes: '{m} min', seconds: '{s} s',
     workers: {
@@ -1271,6 +1317,7 @@ function resizeHall() {
   const r = hall.getBoundingClientRect();
   const u = Math.max(2, Math.min(7.5, Math.min(r.width, r.height * 1.25) / 100));
   hall.style.setProperty('--u', u.toFixed(2) + 'px');
+  Hall.measure();
 }
 
 function renderMachine() {
@@ -1287,49 +1334,232 @@ function applyCity() {
   $('#signCity').textContent = cityName(c);
 }
 
-const hallSprites = new Map();
-function renderHallCats() {
-  const want = [];
-  CONFIG.workers.forEach((w, i) => {
-    const c = S.workers[i];
-    if (!c) return;
-    const n = 1 + CONFIG.hall.extraAt.filter(m => c >= m).length;
-    for (let k = 0; k < n; k++) want.push({ key: i + '-' + k, i, k });
-  });
-  // Сначала по одному коту каждого вида, потом остальные
-  want.sort((a, b) => a.k - b.k || a.i - b.i);
-  want.length = Math.min(want.length, CONFIG.hall.maxSprites);
-  const keys = new Set(want.map(x => x.key));
-  for (const [key, el] of hallSprites) if (!keys.has(key)) { el.remove(); hallSprites.delete(key); }
-  const layer = $('#cats');
-  for (const x of want) {
-    if (hallSprites.has(x.key)) continue;
-    const rng = mulberry32((x.i + 1) * 7919 + x.k * 104729 + S.prestigeCount * 31);
-    let px = 50, py = 90;
-    for (let tries = 0; tries < 40; tries++) {
-      px = 5 + rng() * 90; py = 64 + rng() * 30;
-      if (px < 28 || px > 72) break; // центр зала — для кофемашины
+/* ---------- Живой зал: коты ходят, носят заказы, болтают ----------
+   На каждую профессию — один кот. Чем больше таких сотрудников нанято,
+   тем выше его уровень (CONFIG.hall.tiers): он крупнее, у него ★ и цветное кольцо.
+   Координаты — доли размера зала (0..1), y — точка, где стоят лапы. */
+function workerTier(i) { return CONFIG.hall.tiers.filter(m => S.workers[i] >= m).length; }
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+
+const Hall = {
+  W: 1, H: 1, u: 4,
+  mb: { x0: 0.35, x1: 0.65, y0: 0.5, y1: 0.84 },   // рамка кофемашины
+  cats: new Map(),                                  // индекс сотрудника -> кот
+  walkers: [],                                      // гости, которые входят и уходят
+
+  measure() {
+    const r = hall.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    this.W = r.width; this.H = r.height;
+    this.u = parseFloat(getComputedStyle(hall).getPropertyValue('--u')) || 4;
+    const m = $('#machine').getBoundingClientRect();
+    if (m.width) {
+      this.mb = { x0: (m.left - r.left) / r.width, x1: (m.right - r.left) / r.width, y0: (m.top - r.top) / r.height, y1: (m.bottom - r.top) / r.height };
     }
-    const w = CONFIG.workers[x.i];
+    $('#machine').style.zIndex = String(Math.round(this.mb.y1 * 100));
+  },
+
+  // Центр зала по ширине кофемашины — не место для стоянки: коты её не загораживают
+  blocked(x) {
+    const m = this.mb;
+    return x > m.x0 - 0.03 && x < m.x1 + 0.03;
+  },
+  // Расстояние в пикселях до ближайшего кота (по глубине считаем строже — там перспектива)
+  crowd(x, y, self) {
+    let best = Infinity;
+    for (const c of this.cats.values()) {
+      if (c === self) continue;
+      for (const [ox, oy] of [[c.x, c.y], [c.tx, c.ty]]) {
+        best = Math.min(best, Math.hypot((x - ox) * this.W, (y - oy) * this.H * 1.8));
+      }
+    }
+    return best;
+  },
+  // Свободная точка на полу: 'any', 'left', 'right' или 'edge' (у столиков по бокам)
+  freePoint(where, self) {
+    const f = CONFIG.hall.floor;
+    let best = null, bestD = -1;
+    for (let k = 0; k < 24; k++) {
+      let side = where === 'edge' ? (Math.random() < 0.5 ? 'left' : 'right') : where;
+      const x = side === 'left' ? rand(0.07, 0.3) : side === 'right' ? rand(0.7, 0.93) : rand(0.07, 0.93);
+      const y = rand(f.y0, f.y1);
+      if (this.blocked(x)) continue;
+      const d = this.crowd(x, y, self);
+      if (d > this.u * 16) return { x, y };
+      if (d > bestD) { bestD = d; best = { x, y }; }
+    }
+    return best || { x: 0.15, y: f.y1 };
+  },
+  // Место у кофемашины, где кот «забирает заказ»
+  machineSpot() {
+    const m = this.mb, left = Math.random() < 0.5;
+    return {
+      x: Math.min(0.94, Math.max(0.06, left ? m.x0 - rand(0.03, 0.07) : m.x1 + rand(0.03, 0.07))),
+      y: Math.min(CONFIG.hall.floor.y1, m.y1 + rand(-0.03, 0.03))
+    };
+  },
+
+  makeCat(i, instant) {
+    const w = CONFIG.workers[i];
     const el = document.createElement('div');
-    el.className = 'cat a' + (1 + Math.floor(rng() * 3)) + (Game.started ? ' pop' : '');
-    el.style.left = px.toFixed(1) + '%';
-    el.style.top = py.toFixed(1) + '%';
-    el.style.zIndex = String(Math.round(py));
-    el.style.setProperty('--s', (0.8 + (py - 64) / 30 * 0.3).toFixed(2));
-    el.innerHTML = `<span class="body">${renderIcon(w.icon)}</span><span class="shadow"></span>`;
-    el.firstChild.style.animationDelay = (-rng() * 5).toFixed(2) + 's';
-    el.addEventListener('pointerdown', e => {
-      e.preventDefault();
-      if (Game.paused) return;
-      Sound.play('meow');
-      spawnFx('fx-heart', e.clientX, e.clientY, iconPart(CONFIG.ui.catFx, 'emo'));
+    el.className = 'cat';
+    el.innerHTML = `<div class="ring"></div><div class="flip"><div class="body">${renderIcon(w.icon)}</div></div><div class="badge"></div><div class="bubble"></div>`;
+    const c = {
+      i, el, flip: el.querySelector('.flip'), body: el.querySelector('.body'),
+      badge: el.querySelector('.badge'), bubble: el.querySelector('.bubble'),
+      x: 0, y: 0, tx: 0, ty: 0, moving: false, plan: 'wander', wait: rand(0.5, 2.5),
+      facing: 1, speed: rand(0.85, 1.15), tier: -1, key: '', earned: 0, bubbleT: 0
+    };
+    const p = this.freePoint('any', c);
+    if (instant) { c.x = c.tx = p.x; c.y = c.ty = p.y; }
+    else {
+      // Новый сотрудник входит в кафе из-за края зала
+      c.x = Math.random() < 0.5 ? -0.08 : 1.08; c.y = p.y;
+      c.tx = p.x; c.ty = p.y; c.moving = true;
+      setTimeout(() => this.say(c, pick(t('phrases.hello'))), 600);
+    }
+    el.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); this.pet(c, e); });
+    $('#cats').appendChild(el);
+    this.cats.set(i, c);
+    return c;
+  },
+
+  // Синхронизация с количеством нанятых: появление, уровень, счётчик
+  sync() {
+    CONFIG.workers.forEach((w, i) => {
+      const n = S.workers[i];
+      let c = this.cats.get(i);
+      if (!n) { if (c) { c.el.remove(); this.cats.delete(i); } return; }
+      if (!c) c = this.makeCat(i, !Game.started);
+      const tier = workerTier(i);
+      if (c.tier >= 0 && tier > c.tier) this.tierUp(c, tier);
+      c.tier = tier;
+      const key = tier + '|' + n;
+      if (c.key !== key) {
+        c.key = key;
+        c.el.dataset.tier = tier;
+        c.badge.innerHTML = starImg().repeat(tier) + '×' + fmt(n);
+      }
     });
-    if (Game.started) setTimeout(() => el.classList.remove('pop'), 600);
-    layer.appendChild(el);
-    hallSprites.set(x.key, el);
+  },
+
+  tierUp(c, tier) {
+    toast(t('tierUp', { name: workerName(c.i), n: tier + 1 }), 'gold');
+    Sound.play('achieve');
+    this.say(c, t('phrases.levelUp'));
+    const r = c.el.getBoundingClientRect();
+    for (let k = 0; k < 8; k++) {
+      const a = k / 8 * Math.PI * 2;
+      spawnFx('fx-cup', r.left + r.width / 2, r.top + r.height / 2, iconPart(CONFIG.starIcon, 'emo'), {
+        '--dx': (Math.cos(a) * this.u * 16).toFixed(0) + 'px',
+        '--dy': (Math.sin(a) * this.u * 16).toFixed(0) + 'px',
+        '--rot': '180deg'
+      });
+    }
+  },
+
+  say(c, text) {
+    if (!text) return;
+    c.bubble.textContent = text;
+    c.bubble.classList.add('show');
+    c.bubbleT = 2.2;
+  },
+
+  pet(c, e) {
+    if (Game.paused) return;
+    Sound.play('meow');
+    this.say(c, pick(t('phrases.pet')));
+    c.body.animate([{ transform: 'translateY(0)' }, { transform: 'translateY(-22%)' }, { transform: 'translateY(0)' }],
+      { duration: 380, easing: 'ease-out' });
+    spawnFx('fx-heart', e.clientX, e.clientY, iconPart(CONFIG.ui.catFx, 'emo'));
+  },
+
+  go(c, plan, p) { c.plan = plan; c.tx = p.x; c.ty = p.y; c.moving = true; },
+
+  // Что делать дальше: сходить к кофемашине за заказом или прогуляться
+  nextPlan(c) {
+    if (c.plan === 'fetch') this.go(c, 'deliver', this.freePoint('edge', c));
+    else if (Math.random() < 0.6) this.go(c, 'fetch', this.machineSpot());
+    else this.go(c, 'wander', this.freePoint('any', c));
+  },
+
+  arrive(c) {
+    if (c.plan === 'fetch') { c.wait = rand(0.6, 1.1); return; }
+    if (c.plan === 'deliver') { this.deliver(c); c.wait = rand(1.2, 2.6); return; }
+    c.wait = rand(1.5, 4);
+    this.chat(c);
+  },
+
+  // Доставка заказа: показываем, сколько этот вид котов заработал с прошлой доставки
+  deliver(c) {
+    const amount = c.earned;
+    c.earned = 0;
+    if (!(amount >= 0.1)) return;
+    const r = hall.getBoundingClientRect();
+    const h = c.el.getBoundingClientRect().height;
+    spawnFx('fx-num deliver', r.left + c.x * this.W, r.top + c.y * this.H - h * 0.85, '+' + coinsHTML(amount));
+  },
+
+  // Встретились два свободных кота — перекинулись парой слов
+  chat(c) {
+    if (Math.random() > 0.45) return;
+    let other = null;
+    for (const o of this.cats.values()) {
+      if (o === c || o.moving || o.bubbleT > 0) continue;
+      if (Math.hypot((o.x - c.x) * this.W, (o.y - c.y) * this.H) < this.u * 40) { other = o; break; }
+    }
+    if (other) {
+      this.say(c, pick(t('phrases.greet')));
+      setTimeout(() => { if (this.cats.get(other.i) === other) this.say(other, pick(t('phrases.reply'))); }, 900);
+    } else if (Math.random() < 0.35) {
+      this.say(c, pick(t('phrases.idle')));
+    }
+  },
+
+  // Шаг движения к цели; true — пришёл
+  step(a, dt) {
+    const dxp = (a.tx - a.x) * this.W, dyp = (a.ty - a.y) * this.H;
+    const dist = Math.hypot(dxp, dyp);
+    const stepPx = this.u * CONFIG.hall.walkSpeed * a.speed * dt;
+    if (Math.abs(dxp) > 1) a.facing = dxp < 0 ? -1 : 1;
+    if (dist <= stepPx) { a.x = a.tx; a.y = a.ty; a.moving = false; return true; }
+    a.x += dxp / dist * stepPx / this.W;
+    a.y += dyp / dist * stepPx / this.H;
+    return false;
+  },
+
+  update(dt) {
+    for (const c of this.cats.values()) {
+      c.earned += workerUnitIncome(c.i) * S.workers[c.i] * boostMult() * dt;
+      if (c.moving) { if (this.step(c, dt)) this.arrive(c); }
+      else if ((c.wait -= dt) <= 0) this.nextPlan(c);
+      if (c.bubbleT > 0 && (c.bubbleT -= dt) <= 0) c.bubble.classList.remove('show');
+    }
+    for (const w of this.walkers) if (w.moving && this.step(w, dt) && w.exit) w.el.remove();
+    this.walkers = this.walkers.filter(w => w.el.isConnected);
+  },
+
+  // Перспектива: чем ближе к низу зала, тем крупнее
+  place(a, extra) {
+    const f = CONFIG.hall.floor;
+    const depth = 0.82 + 0.3 * Math.min(1, Math.max(0, (a.y - f.y0) / (f.y1 - f.y0)));
+    const s = depth * (extra || 1);
+    a.el.style.transform = `translate3d(${(a.x * this.W).toFixed(1)}px, ${(a.y * this.H).toFixed(1)}px, 0) translate(-50%, -100%) scale(${s.toFixed(3)})`;
+    a.flip.style.transform = a.facing < 0 ? 'scaleX(-1)' : '';
+    a.el.classList.toggle('walking', a.moving);
+  },
+
+  render() {
+    const m = this.mb;
+    for (const c of this.cats.values()) {
+      this.place(c, 1 + CONFIG.hall.tierScale * c.tier);
+      c.el.style.zIndex = String(Math.round(c.y * 100));
+      // кот, проходящий перед кофемашиной, не перехватывает тап по ней
+      c.el.style.pointerEvents = (c.x > m.x0 && c.x < m.x1 && c.y > m.y0) ? 'none' : 'auto';
+    }
+    for (const w of this.walkers) this.place(w);
   }
-}
+};
 
 let fxCount = 0;
 function spawnFx(cls, clientX, clientY, html, vars) {
@@ -1389,17 +1619,22 @@ function pickGuest(minRarity) {
   return list[Math.floor(Math.random() * list.length)];
 }
 
+// Гость входит из-за края зала, ждёт, а если его не поймали — уходит пешком
 function spawnGuest(minRarity) {
   if (guest) removeGuest(true);
   const g = pickGuest(minRarity);
   const el = document.createElement('div');
   el.className = 'guest ' + g.rarity;
-  el.style.left = (Math.random() < 0.5 ? rand(10, 22) : rand(78, 90)).toFixed(1) + '%';
-  el.style.top = rand(68, 86).toFixed(1) + '%';
-  el.innerHTML = `<span class="body">${renderIcon(g.icon)}</span>${iconPart(CONFIG.starIcon, 'spark')}<span class="gtime"></span>`;
+  el.innerHTML = `<div class="flip"><span class="body">${renderIcon(g.icon)}</span></div>${iconPart(CONFIG.starIcon, 'spark')}<span class="gtime"></span>`;
   el.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); catchGuest(); });
   $('#guestLayer').appendChild(el);
-  guest = { g, left: CONFIG.guests.stay, el };
+  const fromLeft = Math.random() < 0.5;
+  const spot = Hall.freePoint(fromLeft ? 'left' : 'right');
+  guest = {
+    g, el, flip: el.querySelector('.flip'), timeEl: el.querySelector('.gtime'), left: CONFIG.guests.stay,
+    x: fromLeft ? -0.08 : 1.08, y: spot.y, tx: spot.x, ty: spot.y, moving: true, facing: 1, speed: 1.7, exit: false
+  };
+  Hall.walkers.push(guest);
   S.guestTimer = rand(CONFIG.guests.minInterval, CONFIG.guests.maxInterval);
   Sound.play('bell');
   toast(t('guestArrived'), 'blue');
@@ -1407,11 +1642,19 @@ function spawnGuest(minRarity) {
 
 function removeGuest(silent) {
   if (!guest) return;
-  const el = guest.el;
-  el.classList.add('leave');
-  setTimeout(() => el.remove(), 450);
+  const w = guest;
   guest = null;
-  if (!silent) toast(t('guestLeft'));
+  w.el.style.pointerEvents = 'none';
+  w.timeEl.remove();
+  if (silent) {
+    // исчезает на месте (пойман или заменён другим гостем)
+    w.el.animate([{ opacity: 1 }, { opacity: 0, transform: w.el.style.transform + ' translateY(-20%)' }], { duration: 400, fill: 'forwards' });
+    setTimeout(() => w.el.remove(), 420);
+  } else {
+    // не поймали — уходит из кафе
+    w.tx = w.x < 0.5 ? -0.1 : 1.1; w.moving = true; w.exit = true;
+    toast(t('guestLeft'));
+  }
 }
 
 function catchGuest() {
@@ -1452,7 +1695,7 @@ function buyWorker(i) {
   S.coins -= cost;
   S.workers[i] += n;
   recalc();
-  renderHallCats();
+  Hall.sync();
   Sound.play('buy');
   UI.dirty.upgrades = true;
 }
@@ -1542,7 +1785,7 @@ function doPrestige() {
   S.upgrades = {};
   recalc();
   hall.classList.add('moving');
-  setTimeout(() => { applyCity(); renderHallCats(); hall.classList.remove('moving'); }, 400);
+  setTimeout(() => { applyCity(); Hall.sync(); hall.classList.remove('moving'); }, 400);
   UI.dirty.cats = UI.dirty.upgrades = true;
   checkAchievements();
   saveGame(true);
@@ -1721,7 +1964,7 @@ function buildCats() {
     if (i < S.revealed) {
       html += `<div class="row" id="w${i}">
         <div class="ricon">${renderIcon(w.icon)}</div>
-        <div class="rinfo"><div class="rname">${workerName(i)}<span class="cnt"></span></div><div class="rsub"></div></div>
+        <div class="rinfo"><div class="rname">${workerName(i)}<span class="tier"></span><span class="cnt"></span></div><div class="rsub"></div></div>
         <button class="buy" data-buy="${i}"><small></small>${coinImg()} <span></span></button></div>`;
     } else {
       html += `<div class="row locked" id="w${i}">
@@ -1734,7 +1977,7 @@ function buildCats() {
   UI.refs.cats = [];
   for (let i = 0; i < S.revealed; i++) {
     const row = $('#w' + i, p);
-    UI.refs.cats[i] = { cnt: $('.cnt', row), sub: $('.rsub', row), btn: $('.buy', row), q: $('.buy small', row), c: $('.buy span', row) };
+    UI.refs.cats[i] = { tier: $('.tier', row), cnt: $('.cnt', row), sub: $('.rsub', row), btn: $('.buy', row), q: $('.buy small', row), c: $('.buy span', row) };
   }
 }
 function updateCats() {
@@ -1743,6 +1986,7 @@ function updateCats() {
     const r = UI.refs.cats[i];
     if (!r) continue;
     const n = buyAmount(i), cost = costFor(i, n), unit = workerUnitIncome(i);
+    setHTML(r.tier, starImg().repeat(workerTier(i)));
     setText(r.cnt, S.workers[i] ? ' ×' + S.workers[i] : '');
     setText(r.sub, t('perCat', { x: fmt(unit, true) }) + (S.workers[i] ? ' · ' + t('totalIncome', { x: fmt(unit * S.workers[i], true) }) : ''));
     setText(r.q, 'x' + n);
@@ -1914,9 +2158,10 @@ function update(dt) {
   if ((rushBefore && !S.rushLeft) || (frenzyBefore && !S.frenzyLeft)) UI.dirty.upgrades = true;
 
   // Гости
+  Hall.update(dt);
   if (guest) {
-    guest.left -= dt;
-    setText($('.gtime', guest.el), Math.ceil(Math.max(0, guest.left)) + '');
+    if (!guest.moving) guest.left -= dt;   // время пошло, когда гость дошёл до места
+    setText(guest.timeEl, Math.ceil(Math.max(0, guest.left)) + '');
     if (guest.left <= 0) removeGuest(false);
   } else {
     S.guestTimer -= dt;
@@ -1946,6 +2191,7 @@ function frame(now) {
   if (dt < 0) dt = 0;
   if (dt > 5) dt = 5;
   if (!Game.paused) update(dt);
+  Hall.render();
   renderTop();
   uiTimer += dt;
   if (uiTimer >= 0.2) { uiTimer = 0; refreshPanel(false); }
@@ -2057,7 +2303,7 @@ async function boot() {
   resizeHall();
   renderMachine();
   applyCity();
-  renderHallCats();
+  Hall.sync();
   bindEvents();
   let startTab = 'cats';
   try { startTab = localStorage.getItem('catcafe_tab') || 'cats'; } catch (e) {}
