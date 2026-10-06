@@ -7,6 +7,9 @@
 <title>Котокафе</title>
 <!-- Яндекс Игры SDK. При локальном запуске файла нет — игра переключится на заглушки -->
 <script src="/sdk.js"></script>
+<!-- Первые картинки начинают грузиться сразу, параллельно со скриптами -->
+<link rel="preload" as="image" href="img/bg-cafe-1.webp">
+<link rel="preload" as="image" href="img/machine.webp">
 <style>
 /* ===================== ПАЛИТРА ===================== */
 :root {
@@ -25,16 +28,13 @@
   --rare: #3f8fe0;
   --legendary: #f0a500;
   --u: 4px;              /* единица масштаба зала, пересчитывается из JS */
-  --wall1: #ffe9d2; --wall2: #ffd9b3;
-  --floor1: #c98b5a; --floor2: #b67747;
-  --sky1: #9fd8ff; --sky2: #dff3ff;
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body {
   margin: 0; height: 100%; overflow: hidden;
   background: var(--bg); color: var(--ink);
-  font-family: "Trebuchet MS", "Segoe UI", Roboto, Arial, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  font-family: "Trebuchet MS", "Segoe UI", Roboto, Arial, sans-serif;
   font-size: 14px;
   -webkit-user-select: none; user-select: none;
   -webkit-touch-callout: none;
@@ -43,10 +43,6 @@ html, body {
 }
 button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; padding: 0; }
 img { -webkit-user-drag: none; user-select: none; }
-/* Эмодзи-графика: цветные шрифты эмодзи в приоритете */
-.ic, .emo, .ti, .ricon, .gi, .di, .m-icon, .fx-cup, .fx-heart, .iconbtn, .window, .shelf, .m-cup, .m-logo {
-  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Segoe UI Symbol", sans-serif;
-}
 
 /* ===================== КАРКАС ===================== */
 #app {
@@ -81,7 +77,9 @@ img { -webkit-user-drag: none; user-select: none; }
 }
 .balance { flex: 1; min-width: 0; }
 .coins { display: flex; align-items: center; gap: 6px; font-size: 1.75em; font-weight: 800; line-height: 1.1; white-space: nowrap; }
-.coins .ico { font-size: .85em; }
+.coins .ico { font-size: 1.1em; display: flex; }
+.coins .ico img, .chip img { width: 1em; height: 1em; display: block; }
+.chip span:first-child { font-size: 1.35em; display: flex; }
 .cps { color: var(--muted); font-weight: 700; font-size: .95em; white-space: nowrap; }
 .cps.boosted { color: var(--accent-dark); }
 .chip {
@@ -91,41 +89,22 @@ img { -webkit-user-drag: none; user-select: none; }
   font-weight: 800; white-space: nowrap;
 }
 .chip.glow { border-color: var(--legendary); box-shadow: 0 0 0 3px rgba(240,165,0,.25); animation: pulse 1.4s infinite; }
-.iconbtn { width: 38px; height: 38px; border-radius: 50%; background: #fff; border: 2px solid var(--line); font-size: 18px; }
+.iconbtn { width: 38px; height: 38px; border-radius: 50%; background: #fff; border: 2px solid var(--line); font-size: 18px; display: flex; align-items: center; justify-content: center; color: var(--ink); }
 
 /* ===================== ЗАЛ КАФЕ ===================== */
-#hall { grid-area: hall; position: relative; overflow: hidden; transition: filter .6s; }
+#hall { grid-area: hall; position: relative; overflow: hidden; transition: filter .6s; background: #c58a55; }
 #hall.moving { filter: brightness(1.6) saturate(.4); }
-.wall {
-  position: absolute; left: 0; right: 0; top: 0; height: 47%;
-  background: linear-gradient(var(--wall1), var(--wall2));
-  background-size: cover; background-position: center;
+/* Фон зала — картинка города (CONFIG.cities[].bg) */
+.hall-bg {
+  position: absolute; inset: 0;
+  background-color: #c58a55; background-repeat: no-repeat;
+  background-size: cover; background-position: center 30%;
 }
-.wall::before { /* обои в горошек */
-  content: ""; position: absolute; inset: 0; opacity: .35;
-  background-image: radial-gradient(rgba(255,255,255,.9) 18%, transparent 20%);
-  background-size: calc(var(--u) * 6) calc(var(--u) * 6);
+.hall-tint { position: absolute; inset: 0; mix-blend-mode: soft-light; pointer-events: none; }
+.hall-bg::after { /* лёгкое затемнение сверху, чтобы читалась вывеска */
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(rgba(60,30,10,.25), transparent 22%, transparent 80%, rgba(60,30,10,.25));
 }
-.wall::after { /* плинтус */
-  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: calc(var(--u) * 1.6);
-  background: rgba(110, 68, 38, .35);
-}
-.floor {
-  position: absolute; left: 0; right: 0; top: 47%; bottom: 0;
-  background: repeating-conic-gradient(var(--floor1) 0 25%, var(--floor2) 0 50%) 0 0 / calc(var(--u) * 10) calc(var(--u) * 10);
-}
-.floor::after { content: ""; position: absolute; inset: 0; background: linear-gradient(rgba(0,0,0,.18), transparent 40%); }
-.window {
-  position: absolute; left: 5%; top: 12%;
-  width: calc(var(--u) * 21); height: calc(var(--u) * 17);
-  border: calc(var(--u) * 1.2) solid #fff; border-radius: calc(var(--u) * 2);
-  background: linear-gradient(var(--sky1), var(--sky2));
-  box-shadow: 0 3px 0 rgba(0,0,0,.12);
-  display: flex; align-items: flex-end; justify-content: center;
-  font-size: calc(var(--u) * 9); overflow: hidden;
-}
-.window::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: calc(var(--u) * .8); background: #fff; transform: translateX(-50%); }
-.window > span { position: relative; z-index: 1; margin-bottom: calc(var(--u) * .5); }
 .sign {
   position: absolute; left: 50%; top: 3%; transform: translateX(-50%);
   background: linear-gradient(#a8693d, #8b532c); color: #fff3df;
@@ -135,101 +114,60 @@ img { -webkit-user-drag: none; user-select: none; }
 }
 .sign b { display: block; font-size: 1.15em; letter-spacing: .5px; }
 .sign span { opacity: .85; font-size: .85em; }
-.shelf {
-  position: absolute; right: 5%; top: 22%;
-  width: calc(var(--u) * 24); height: calc(var(--u) * 10);
-  border-bottom: calc(var(--u) * 1.4) solid #9b6238;
-  display: flex; align-items: flex-end; justify-content: space-around;
-  font-size: calc(var(--u) * 6);
-}
-.lamp { position: absolute; top: 0; width: 2px; height: 10%; background: #6b4a33; }
-.lamp::after {
-  content: ""; position: absolute; left: 50%; bottom: calc(var(--u) * -3); transform: translateX(-50%);
-  width: calc(var(--u) * 6); height: calc(var(--u) * 3.4); border-radius: 50% 50% 10% 10%;
-  background: #ffcf6e; box-shadow: 0 calc(var(--u) * 2) calc(var(--u) * 6) rgba(255,207,110,.8);
-}
-.lamp.l1 { left: 30%; } .lamp.l2 { left: 70%; }
-.counter {
-  position: absolute; left: 24%; right: 24%; bottom: 26%; height: 12%;
-  background: linear-gradient(#bf8150, #8d5a34);
-  border-radius: calc(var(--u) * 2) calc(var(--u) * 2) calc(var(--u) * .8) calc(var(--u) * .8);
-  box-shadow: 0 calc(var(--u) * 1.2) 0 #6e4426, inset 0 calc(var(--u) * .8) 0 rgba(255,255,255,.25);
-  z-index: 60;
-}
 
 /* --- Кофемашина (главный объект для тапа) --- */
 #machine {
-  position: absolute; left: 50%; bottom: 35%;
-  width: calc(var(--u) * 30); height: calc(var(--u) * 37);
+  position: absolute; left: 50%; bottom: 16%;
+  width: calc(var(--u) * 34); height: calc(var(--u) * 34);
   transform: translateX(-50%); transform-origin: 50% 100%;
   z-index: 70; cursor: pointer; touch-action: none;
+  filter: drop-shadow(0 calc(var(--u) * 1.2) calc(var(--u) * 1.2) rgba(0,0,0,.35));
 }
-#machine img { width: 100%; height: 100%; object-fit: contain; }
-.m-top {
-  position: absolute; left: 8%; right: 8%; top: 0; height: 15%;
-  background: linear-gradient(#ffffff, #b8b8b8);
-  border-radius: 45% 45% 12% 12% / 70% 70% 12% 12%;
-  box-shadow: inset 0 -3px 0 rgba(0,0,0,.15);
-}
-.m-body {
-  position: absolute; left: 0; right: 0; top: 13%; height: 57%;
-  background: linear-gradient(135deg, #ee6650, #b83a2b);
-  border-radius: 14% 14% 8% 8%;
-  box-shadow: inset calc(var(--u) * -1.5) calc(var(--u) * -1.5) 0 rgba(0,0,0,.12), 0 calc(var(--u) * 1) 0 #8a2a1f;
-}
-.m-panel {
-  position: absolute; left: 14%; right: 14%; top: 12%; height: 30%;
-  background: #2f2a28; border-radius: calc(var(--u) * 2);
-  display: flex; align-items: center; justify-content: space-around;
-}
-.m-light { width: 16%; aspect-ratio: 1; border-radius: 50%; background: #7cfc00; box-shadow: 0 0 6px #7cfc00; }
-.m-light.b { background: #ffd23f; box-shadow: 0 0 6px #ffd23f; animation: blink 1.6s infinite; }
-.m-logo { position: absolute; left: 50%; bottom: 8%; transform: translateX(-50%); font-size: calc(var(--u) * 7); opacity: .9; }
-.m-nozzle { position: absolute; left: 41%; width: 18%; top: 70%; height: 7%; background: #4d4d4d; border-radius: 0 0 calc(var(--u)) calc(var(--u)); }
-.m-base { position: absolute; left: -5%; right: -5%; bottom: 0; height: 8%; background: linear-gradient(#e6e6e6, #9a9a9a); border-radius: calc(var(--u) * 1.6); }
-.m-cup { position: absolute; left: 50%; bottom: 6%; transform: translateX(-50%); font-size: calc(var(--u) * 9); line-height: 1; }
-.steam { position: absolute; bottom: 20%; width: calc(var(--u) * 1.4); height: calc(var(--u) * 6); border-radius: 50%; background: rgba(255,255,255,.75); filter: blur(1px); opacity: 0; animation: steam 2.4s infinite; }
-.steam.s1 { left: 44%; } .steam.s2 { left: 54%; animation-delay: 1.2s; }
+#machine img { width: 100%; height: 100%; object-fit: contain; display: block; pointer-events: none; }
+.steam { position: absolute; bottom: 52%; width: calc(var(--u) * 1.4); height: calc(var(--u) * 6); border-radius: 50%; background: rgba(255,255,255,.8); filter: blur(1px); opacity: 0; animation: steam 2.4s infinite; pointer-events: none; }
+.steam.s1 { left: 38%; } .steam.s2 { left: 46%; animation-delay: 1.2s; }
 
 /* --- Коты в зале --- */
 #cats { position: absolute; inset: 0; pointer-events: none; }
 .cat {
   position: absolute; transform: translate(-50%, -100%) scale(var(--s, 1));
-  font-size: calc(var(--u) * 10); line-height: 1; pointer-events: auto; cursor: pointer;
+  font-size: calc(var(--u) * 20); line-height: 1; pointer-events: auto; cursor: pointer;
 }
-.cat .body { display: block; transform-origin: 50% 100%; }
+.cat .body { display: block; transform-origin: 50% 100%; filter: drop-shadow(0 2px 2px rgba(0,0,0,.3)); }
 .cat.a1 .body { animation: bob 1.8s ease-in-out infinite; }
 .cat.a2 .body { animation: sway 2.6s ease-in-out infinite; }
 .cat.a3 .body { animation: walk 7s ease-in-out infinite; }
-.cat .shadow { position: absolute; left: 10%; right: 10%; bottom: -6%; height: 14%; border-radius: 50%; background: rgba(0,0,0,.2); z-index: -1; }
+.cat .shadow { position: absolute; left: 18%; right: 18%; bottom: -3%; height: 8%; border-radius: 50%; background: rgba(0,0,0,.28); z-index: -1; }
 .cat.pop .body { animation: pop .5s ease-out; }
 
-/* --- Иконки: эмодзи + значок (легко заменить на картинку) --- */
-.ic { position: relative; display: inline-block; line-height: 1; }
+/* --- Иконки: картинка (или эмодзи) + значок --- */
+.ic { position: relative; display: inline-block; line-height: 1; vertical-align: middle; }
 .ic .emo { display: block; }
 .ic img.emo { width: 1em; height: 1em; object-fit: contain; }
-.ic .bdg { position: absolute; right: -22%; bottom: -10%; font-size: .52em; }
-.ic img.bdg { width: .52em; height: .52em; object-fit: contain; }
+.ic .bdg { position: absolute; right: -18%; bottom: -8%; font-size: .5em; }
+.ic img.bdg { width: 1.1em; height: 1.1em; object-fit: contain; background: #fff; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+img.ci { width: 1.15em; height: 1.15em; vertical-align: -.25em; object-fit: contain; }
 .sil { filter: brightness(0); opacity: .35; }
+svg.ui { width: 1.1em; height: 1.1em; vertical-align: -.2em; fill: currentColor; }
 
 /* --- Редкий гость --- */
 #guestLayer { position: absolute; inset: 0; pointer-events: none; z-index: 200; }
 .guest {
   position: absolute; transform: translate(-50%, -100%);
-  font-size: calc(var(--u) * 13); line-height: 1; pointer-events: auto; cursor: pointer;
+  font-size: calc(var(--u) * 22); line-height: 1; pointer-events: auto; cursor: pointer;
   animation: guestIn .5s ease-out;
 }
 .guest .body { display: block; animation: bob 1s ease-in-out infinite; }
 .guest::before {
-  content: ""; position: absolute; left: 50%; top: 55%; width: 150%; aspect-ratio: 1;
+  content: ""; position: absolute; left: 50%; top: 55%; width: 130%; aspect-ratio: 1;
   transform: translate(-50%, -50%); border-radius: 50%;
   background: radial-gradient(rgba(255,255,255,.95), rgba(255,255,255,0) 65%);
   animation: glow 1s infinite; z-index: -1;
 }
 .guest.rare::before { background: radial-gradient(rgba(120,180,255,.95), rgba(120,180,255,0) 65%); }
 .guest.legendary::before { background: radial-gradient(rgba(255,210,80,1), rgba(255,210,80,0) 65%); }
-.guest .spark { position: absolute; top: -20%; right: -20%; font-size: .4em; animation: spin 2s linear infinite; }
-.guest .gtime { position: absolute; left: 50%; top: -24%; transform: translateX(-50%); font-size: .22em; font-weight: 800; background: #fff; border-radius: 999px; padding: 1px 6px; box-shadow: 0 1px 3px rgba(0,0,0,.2); white-space: nowrap; }
+.guest .spark { position: absolute; top: -6%; right: -12%; width: .3em; height: .3em; animation: spin 2s linear infinite; }
+.guest .gtime { position: absolute; left: 50%; top: -14%; transform: translateX(-50%); font-size: .14em; font-weight: 800; background: #fff; border-radius: 999px; padding: 1px 6px; box-shadow: 0 1px 3px rgba(0,0,0,.2); white-space: nowrap; }
 .guest.leave { animation: guestOut .4s ease-in forwards; }
 
 /* --- Эффекты тапа --- */
@@ -237,11 +175,13 @@ img { -webkit-user-drag: none; user-select: none; }
 .fx-num {
   position: absolute; transform: translate(-50%, -50%);
   font-weight: 900; font-size: clamp(16px, calc(var(--u) * 5), 30px); color: #fff;
-  text-shadow: 0 2px 0 #b8551b, 0 0 6px rgba(0,0,0,.25);
+  text-shadow: 0 2px 0 #b8551b, 0 0 6px rgba(0,0,0,.35);
   animation: floatUp .9s ease-out forwards; white-space: nowrap;
 }
+.fx-num .ic { font-size: calc(var(--u) * 12); }
 .fx-cup { position: absolute; font-size: calc(var(--u) * 7); transform: translate(-50%, -50%); animation: cupFly .9s ease-out forwards; }
 .fx-heart { position: absolute; transform: translate(-50%, -50%); font-size: calc(var(--u) * 5); animation: floatUp 1s ease-out forwards; }
+.fx-cup img, .fx-heart img { width: 1em; height: 1em; display: block; }
 
 /* --- Индикаторы бустов, кнопки зала, уведомления --- */
 #boosts { position: absolute; left: 8px; top: 8px; display: flex; flex-direction: column; gap: 6px; z-index: 250; }
@@ -258,7 +198,7 @@ img { -webkit-user-drag: none; user-select: none; }
 .hallbtn:disabled { background: #b9aed8; box-shadow: 0 3px 0 #9a8fbb; cursor: default; }
 .hallbtn.active:disabled { background: var(--accent); box-shadow: 0 3px 0 var(--accent-dark); }
 .hallbtn:not(:disabled):active { transform: translateY(2px); box-shadow: 0 1px 0 var(--ad-dark); }
-#toasts { position: absolute; left: 50%; bottom: 52px; transform: translateX(-50%); width: min(92%, 420px); display: flex; flex-direction: column; align-items: center; gap: 6px; z-index: 400; pointer-events: none; }
+#toasts { position: absolute; left: 50%; top: 17%; transform: translateX(-50%); width: min(92%, 420px); display: flex; flex-direction: column; align-items: center; gap: 6px; z-index: 400; pointer-events: none; }
 .toast {
   background: rgba(74, 47, 29, .92); color: #fff; border-radius: 14px;
   padding: 8px 14px; font-weight: 700; text-align: center;
@@ -289,7 +229,9 @@ img { -webkit-user-drag: none; user-select: none; }
   display: flex; flex-direction: column; align-items: center; gap: 1px;
   font-weight: 700; font-size: .82em; color: var(--muted);
 }
-#tabs button .ti { font-size: 1.55em; line-height: 1.1; }
+#tabs button .ti { font-size: 2.1em; line-height: 1; height: 1em; }
+#tabs button .ti img { width: 1em; height: 1em; display: block; }
+#tabs button:not(.active) .ti { filter: saturate(.6); opacity: .85; }
 #tabs button.active { color: var(--ink); background: var(--panel); box-shadow: inset 0 3px 0 var(--accent); }
 #tabs .dot { position: absolute; top: 4px; right: calc(50% - 22px); min-width: 10px; height: 10px; border-radius: 999px; background: #ff4d4d; display: none; }
 #tabs .dot.on { display: block; }
@@ -304,7 +246,7 @@ img { -webkit-user-drag: none; user-select: none; }
   background: var(--card); border-radius: 14px; padding: 8px 10px;
   box-shadow: 0 2px 0 var(--line);
 }
-.row .ricon { width: 46px; flex: 0 0 46px; text-align: center; font-size: 34px; }
+.row .ricon { width: 52px; flex: 0 0 52px; text-align: center; font-size: 50px; }
 .row .rinfo { flex: 1; min-width: 0; }
 .row .rname { font-weight: 800; line-height: 1.2; }
 .row .rname .cnt { color: var(--accent-dark); margin-left: 4px; }
@@ -334,12 +276,13 @@ img { -webkit-user-drag: none; user-select: none; }
 
 /* Коллекция */
 .col-head { background: #fff; border-radius: 14px; padding: 8px 12px; margin-bottom: 8px; font-weight: 800; box-shadow: 0 2px 0 var(--line); text-align: center; }
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); gap: 6px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
+.gcard .gr { font-size: .7em; font-weight: 800; text-transform: uppercase; letter-spacing: .4px; }
 .gcard {
   background: #fff; border-radius: 14px; padding: 8px 4px 6px; text-align: center;
   border: 2px solid var(--line); position: relative;
 }
-.gcard .gi { font-size: 36px; height: 44px; display: flex; align-items: center; justify-content: center; }
+.gcard .gi { font-size: 72px; height: 76px; display: flex; align-items: center; justify-content: center; }
 .gcard .gn { font-size: .78em; font-weight: 700; line-height: 1.15; min-height: 2.3em; display: flex; align-items: center; justify-content: center; }
 .gcard .gc { font-size: .72em; color: var(--muted); }
 .gcard.common { border-color: var(--common); }
@@ -349,7 +292,7 @@ img { -webkit-user-drag: none; user-select: none; }
 .rar-common { color: var(--common); } .rar-rare { color: var(--rare); } .rar-legendary { color: var(--legendary); }
 
 /* Достижения */
-.ach .ricon { font-size: 30px; }
+.ach .ricon { font-size: 42px; }
 .ach.locked .ricon { filter: grayscale(1); opacity: .5; }
 .ach.done { background: #f3fff2; box-shadow: 0 2px 0 #cfe9c9; }
 .bar { height: 6px; border-radius: 999px; background: #f1e4d4; margin-top: 4px; overflow: hidden; }
@@ -370,7 +313,8 @@ img { -webkit-user-drag: none; user-select: none; }
   box-shadow: 0 10px 40px rgba(0,0,0,.35); text-align: center;
   animation: popIn .25s ease-out;
 }
-.mcard .m-icon { font-size: 52px; line-height: 1.1; }
+.mcard .m-icon { font-size: 88px; line-height: 1; display: flex; justify-content: center; }
+.mcard .m-icon img { width: 1em; height: 1em; object-fit: contain; }
 .mcard h2 { margin: 4px 0 8px; font-size: 1.3em; }
 .mcard p { margin: 6px 0; line-height: 1.35; }
 .mcard .big-amount { font-size: 1.8em; font-weight: 900; margin: 8px 0; color: var(--accent-dark); }
@@ -381,11 +325,12 @@ img { -webkit-user-drag: none; user-select: none; }
 .btn:active { transform: translateY(2px); }
 .daily { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px; }
 .dcell { background: #fff; border: 2px solid var(--line); border-radius: 12px; padding: 6px 2px; font-size: .8em; }
-.dcell .di { font-size: 22px; }
+.dcell .di { font-size: 30px; height: 32px; display: flex; align-items: center; justify-content: center; }
+.dcell .di img { width: 1em; height: 1em; }
 .dcell .da { font-weight: 800; }
 .dcell .dg { color: var(--rare); font-weight: 800; font-size: .9em; }
 .dcell.done { opacity: .55; }
-.dcell.done .di::after { content: " ✔"; font-size: 14px; color: var(--good); }
+.dcell.done .di::after { content: "\2713"; font-size: 16px; font-weight: 900; color: var(--good); margin-left: 2px; }
 .dcell.today { border-color: var(--accent); background: #fff2e3; box-shadow: 0 0 0 3px rgba(255,140,66,.25); }
 .dcell:nth-child(7) { grid-column: span 2; }
 #adStub .mcard { background: #222; color: #fff; }
@@ -423,22 +368,17 @@ img { -webkit-user-drag: none; user-select: none; }
 <div id="app">
   <header id="top">
     <div class="balance">
-      <div class="coins"><span class="ico" id="coinIco">🪙</span><span id="coins">0</span></div>
+      <div class="coins"><span class="ico" id="coinIco"></span><span id="coins">0</span></div>
       <div class="cps" id="cps">0/с</div>
     </div>
-    <button class="chip" id="starsChip"><span id="starIco">⭐</span><span id="stars">0</span></button>
-    <button class="iconbtn" id="soundBtn" aria-label="sound">🔊</button>
+    <button class="chip" id="starsChip"><span id="starIco"></span><span id="stars">0</span></button>
+    <button class="iconbtn" id="soundBtn" aria-label="sound"></button>
   </header>
 
   <main id="hall">
-    <div class="wall">
-      <div class="window"><span id="cityIcon"></span></div>
-      <div class="shelf" id="shelf"></div>
-      <div class="lamp l1"></div><div class="lamp l2"></div>
-    </div>
+    <div class="hall-bg" id="hallBg"></div>
+    <div class="hall-tint" id="hallTint"></div>
     <div class="sign"><b id="signTitle"></b><span id="signCity"></span></div>
-    <div class="floor"></div>
-    <div class="counter"></div>
     <div id="machine" role="button"></div>
     <div id="cats"></div>
     <div id="guestLayer"></div>
@@ -457,25 +397,27 @@ img { -webkit-user-drag: none; user-select: none; }
       <div class="tab-page" id="page-achievements"></div>
     </div>
     <nav id="tabs">
-      <button data-tab="cats"><span class="ti">🐱</span><span data-i18n="tabCats"></span><i class="dot"></i></button>
-      <button data-tab="upgrades"><span class="ti">⚡</span><span data-i18n="tabUpgrades"></span><i class="dot"></i></button>
-      <button data-tab="collection"><span class="ti">📖</span><span data-i18n="tabCollection"></span><i class="dot"></i></button>
-      <button data-tab="achievements"><span class="ti">🏆</span><span data-i18n="tabAch"></span><i class="dot"></i></button>
+      <button data-tab="cats"><span class="ti" data-icon="tabCats"></span><span data-i18n="tabCats"></span><i class="dot"></i></button>
+      <button data-tab="upgrades"><span class="ti" data-icon="tabUpgrades"></span><span data-i18n="tabUpgrades"></span><i class="dot"></i></button>
+      <button data-tab="collection"><span class="ti" data-icon="tabCollection"></span><span data-i18n="tabCollection"></span><i class="dot"></i></button>
+      <button data-tab="achievements"><span class="ti" data-icon="tabAch"></span><span data-i18n="tabAch"></span><i class="dot"></i></button>
     </nav>
   </section>
 </div>
 
 <div class="overlay" id="modal"></div>
-<div class="overlay" id="adStub"><div class="mcard"><div class="m-icon">📺</div><h2 id="adStubText"></h2><p id="adStubKind"></p></div></div>
+<div class="overlay" id="adStub"><div class="mcard"><div class="m-icon"><svg class="ui" viewBox="0 0 24 24"><path d="M3 5h18a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-7v2h3v1H7v-1h3v-2H3a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zm6 3v7l6-3.5z"/></svg></div><h2 id="adStubText"></h2><p id="adStubKind"></p></div></div>
 
 <script>
 'use strict';
 
 /* =====================================================================
    КОНФИГ: все числа баланса и списки контента.
-   Поле icon — эмодзи или путь к картинке ("img/cat.png"): renderIcon()
+   Поле icon — путь к картинке (img/*.webp) или эмодзи: renderIcon()
    сам подставит <img>, если строка похожа на файл.
+   Картинки собираются из исходников sprites/ скриптом tools/build_sprites.py
    ===================================================================== */
+const IMG = 'img/';
 const CONFIG = {
   version: 1,
   saveKey: 'catcafe_save_v1',
@@ -483,78 +425,92 @@ const CONFIG = {
   costGrowth: 1.15,             // цена = базовая × 1.15^количество
   upgradeMult: 2,               // каждое улучшение удваивает доход
   revealFraction: 0.5,          // сотрудник открывается, когда есть половина его цены
-  coinIcon: '🪙',
-  starIcon: '⭐',
+  coinIcon: IMG + 'coin.webp',
+  starIcon: IMG + 'star.webp',
+
+  // Иконки интерфейса
+  ui: {
+    tabCats: IMG + 'cat-barista.webp',
+    tabUpgrades: IMG + 'up-machine.webp',
+    tabCollection: IMG + 'guest-panda.webp',
+    tabAch: IMG + 'star.webp',
+    offline: IMG + 'cat-barista.webp',   // окно «Пока вас не было»
+    daily: IMG + 'coin.webp',            // окно ежедневной награды
+    dailyGuest: IMG + 'guest-panda.webp',// 7-й день: редкий гость
+    tapFx: IMG + 'coin.webp',            // вылетает из кофемашины при тапе
+    catFx: IMG + 'star.webp'             // появляется при тапе по коту в зале
+  },
 
   // Тап по кофемашине: base × множители улучшений + доля дохода в секунду
   tap: { base: 1, cpsShare: 0.02 },
-  machine: { icon: '☕', logo: '🐾', image: '' }, // image: картинка всей машины вместо CSS
+  machine: { icon: IMG + 'machine.webp' },
 
   // Зал: сколько фигурок кота показывать (1 + по одной за каждый рубеж)
-  hall: { extraAt: [10, 25, 50, 100], maxSprites: 28 },
+  hall: { extraAt: [10, 25, 50, 100], maxSprites: 16 },
 
   // Сотрудники
   workers: [
-    { id: 'barista',  icon: '😺', badge: '☕', cost: 15,        income: 0.1 },
-    { id: 'baker',    icon: '🐱', badge: '🥐', cost: 100,       income: 1 },
-    { id: 'waiter',   icon: '😸', badge: '🍽️', cost: 1100,      income: 8 },
-    { id: 'icecream', icon: '😻', badge: '🍦', cost: 12000,     income: 47 },
-    { id: 'pastry',   icon: '😽', badge: '🎂', cost: 130000,    income: 260 },
-    { id: 'sushi',    icon: '😼', badge: '🍣', cost: 1400000,   income: 1400 },
-    { id: 'dj',       icon: '🐈‍⬛', badge: '🎧', cost: 20000000,  income: 7800 },
-    { id: 'chef',     icon: '🐈', badge: '🍲', cost: 330000000, income: 44000 }
+    { id: 'barista',  icon: IMG + 'cat-barista.webp',  cost: 15,        income: 0.1 },
+    { id: 'baker',    icon: IMG + 'cat-baker.webp',    cost: 100,       income: 1 },
+    { id: 'waiter',   icon: IMG + 'cat-waiter.webp',   cost: 1100,      income: 8 },
+    { id: 'icecream', icon: IMG + 'cat-icecream.webp', cost: 12000,     income: 47 },
+    { id: 'pastry',   icon: IMG + 'cat-pastry.webp',   cost: 130000,    income: 260 },
+    { id: 'sushi',    icon: IMG + 'cat-sushi.webp',    cost: 1400000,   income: 1400 },
+    { id: 'dj',       icon: IMG + 'cat-dj.webp',       cost: 20000000,  income: 7800 },
+    { id: 'chef',     icon: IMG + 'cat-chef.webp',     cost: 330000000, income: 44000 }
   ],
 
-  // Улучшения. type 'tap' — сила тапа ×2; type 'worker' — доход сотрудника ×2 после need штук
+  // Улучшения. type 'tap' — сила тапа ×2; type 'worker' — доход сотрудника ×2 после need штук.
+  // У улучшений сотрудника рядом с иконкой рисуется значок самого кота.
   upgrades: [
-    { id: 'tap1',  type: 'tap', icon: '⚙️', cost: 50 },
-    { id: 'tap2',  type: 'tap', icon: '🫘', cost: 500 },
-    { id: 'tap3',  type: 'tap', icon: '🏺', cost: 5000 },
-    { id: 'tap4',  type: 'tap', icon: '🥛', cost: 5e4 },
-    { id: 'tap5',  type: 'tap', icon: '🌿', cost: 5e5 },
-    { id: 'tap6',  type: 'tap', icon: '🎨', cost: 5e6 },
-    { id: 'tap7',  type: 'tap', icon: '🌀', cost: 5e7 },
-    { id: 'tap8',  type: 'tap', icon: '💎', cost: 5e8 },
-    { id: 'tap9',  type: 'tap', icon: '🌙', cost: 5e9 },
-    { id: 'tap10', type: 'tap', icon: '⚛️', cost: 5e10 },
-    { id: 'tap11', type: 'tap', icon: '🐾', cost: 5e11 },
-    { id: 'tap12', type: 'tap', icon: '🔥', cost: 5e12 },
+    { id: 'tap1',  type: 'tap', icon: IMG + 'up-machine.webp', cost: 50 },
+    { id: 'tap2',  type: 'tap', icon: IMG + 'up-machine.webp', cost: 500 },
+    { id: 'tap3',  type: 'tap', icon: IMG + 'up-machine.webp', cost: 5000 },
+    { id: 'tap4',  type: 'tap', icon: IMG + 'up-machine.webp', cost: 5e4 },
+    { id: 'tap5',  type: 'tap', icon: IMG + 'up-machine.webp', cost: 5e5 },
+    { id: 'tap6',  type: 'tap', icon: IMG + 'up-machine.webp', cost: 5e6 },
+    { id: 'tap7',  type: 'tap', icon: IMG + 'up-machine.webp', cost: 5e7 },
+    { id: 'tap8',  type: 'tap', icon: IMG + 'up-machine.webp', cost: 5e8 },
+    { id: 'tap9',  type: 'tap', icon: IMG + 'up-machine.webp', cost: 5e9 },
+    { id: 'tap10', type: 'tap', icon: IMG + 'up-machine.webp', cost: 5e10 },
+    { id: 'tap11', type: 'tap', icon: IMG + 'up-machine.webp', cost: 5e11 },
+    { id: 'tap12', type: 'tap', icon: IMG + 'up-machine.webp', cost: 5e12 },
 
-    { id: 'barista1',  type: 'worker', worker: 'barista',  need: 10,  icon: '🎽', cost: 300 },
-    { id: 'barista2',  type: 'worker', worker: 'barista',  need: 25,  icon: '🎨', cost: 3000 },
-    { id: 'barista3',  type: 'worker', worker: 'barista',  need: 50,  icon: '🥄', cost: 75000 },
-    { id: 'barista4',  type: 'worker', worker: 'barista',  need: 100, icon: '🏆', cost: 3e7 },
-    { id: 'baker1',    type: 'worker', worker: 'baker',    need: 10,  icon: '🧢', cost: 2000 },
-    { id: 'baker2',    type: 'worker', worker: 'baker',    need: 25,  icon: '🪵', cost: 20000 },
-    { id: 'baker3',    type: 'worker', worker: 'baker',    need: 50,  icon: '🥐', cost: 5e5 },
-    { id: 'baker4',    type: 'worker', worker: 'baker',    need: 100, icon: '🔥', cost: 2e8 },
-    { id: 'waiter1',   type: 'worker', worker: 'waiter',   need: 10,  icon: '🛼', cost: 22000 },
-    { id: 'waiter2',   type: 'worker', worker: 'waiter',   need: 25,  icon: '🛸', cost: 2.2e5 },
-    { id: 'waiter3',   type: 'worker', worker: 'waiter',   need: 50,  icon: '📜', cost: 5.5e6 },
-    { id: 'waiter4',   type: 'worker', worker: 'waiter',   need: 100, icon: '🌀', cost: 2.2e9 },
-    { id: 'icecream1', type: 'worker', worker: 'icecream', need: 10,  icon: '🧊', cost: 2.4e5 },
-    { id: 'icecream2', type: 'worker', worker: 'icecream', need: 25,  icon: '🍦', cost: 2.4e6 },
-    { id: 'icecream3', type: 'worker', worker: 'icecream', need: 50,  icon: '🐟', cost: 6e7 },
-    { id: 'icecream4', type: 'worker', worker: 'icecream', need: 100, icon: '❄️', cost: 2.4e10 },
-    { id: 'pastry1',   type: 'worker', worker: 'pastry',   need: 10,  icon: '🎀', cost: 2.6e6 },
-    { id: 'pastry2',   type: 'worker', worker: 'pastry',   need: 25,  icon: '🧶', cost: 2.6e7 },
-    { id: 'pastry3',   type: 'worker', worker: 'pastry',   need: 50,  icon: '🍰', cost: 6.5e8 },
-    { id: 'pastry4',   type: 'worker', worker: 'pastry',   need: 100, icon: '🎂', cost: 2.6e11 },
-    { id: 'sushi1',    type: 'worker', worker: 'sushi',    need: 10,  icon: '🔪', cost: 2.8e7 },
-    { id: 'sushi2',    type: 'worker', worker: 'sushi',    need: 25,  icon: '🐟', cost: 2.8e8 },
-    { id: 'sushi3',    type: 'worker', worker: 'sushi',    need: 50,  icon: '🍣', cost: 7e9 },
-    { id: 'sushi4',    type: 'worker', worker: 'sushi',    need: 100, icon: '⚔️', cost: 2.8e12 },
-    { id: 'dj1',       type: 'worker', worker: 'dj',       need: 10,  icon: '🎧', cost: 4e8 },
-    { id: 'dj2',       type: 'worker', worker: 'dj',       need: 25,  icon: '🧶', cost: 4e9 },
-    { id: 'dj3',       type: 'worker', worker: 'dj',       need: 50,  icon: '🎵', cost: 1e11 },
-    { id: 'dj4',       type: 'worker', worker: 'dj',       need: 100, icon: '🪩', cost: 4e13 },
-    { id: 'chef1',     type: 'worker', worker: 'chef',     need: 10,  icon: '👒', cost: 6.6e9 },
-    { id: 'chef2',     type: 'worker', worker: 'chef',     need: 25,  icon: '🥄', cost: 6.6e10 },
-    { id: 'chef3',     type: 'worker', worker: 'chef',     need: 50,  icon: '⭐', cost: 1.65e12 },
-    { id: 'chef4',     type: 'worker', worker: 'chef',     need: 100, icon: '🥸', cost: 6.6e14 }
+    { id: 'barista1',  type: 'worker', worker: 'barista',  need: 10,  icon: IMG + 'up-machine.webp',  cost: 300 },
+    { id: 'barista2',  type: 'worker', worker: 'barista',  need: 25,  icon: IMG + 'up-machine.webp',  cost: 3000 },
+    { id: 'barista3',  type: 'worker', worker: 'barista',  need: 50,  icon: IMG + 'up-machine.webp',  cost: 75000 },
+    { id: 'barista4',  type: 'worker', worker: 'barista',  need: 100, icon: IMG + 'up-machine.webp',  cost: 3e7 },
+    { id: 'baker1',    type: 'worker', worker: 'baker',    need: 10,  icon: IMG + 'up-showcase.webp', cost: 2000 },
+    { id: 'baker2',    type: 'worker', worker: 'baker',    need: 25,  icon: IMG + 'up-showcase.webp', cost: 20000 },
+    { id: 'baker3',    type: 'worker', worker: 'baker',    need: 50,  icon: IMG + 'up-showcase.webp', cost: 5e5 },
+    { id: 'baker4',    type: 'worker', worker: 'baker',    need: 100, icon: IMG + 'up-showcase.webp', cost: 2e8 },
+    { id: 'waiter1',   type: 'worker', worker: 'waiter',   need: 10,  icon: IMG + 'up-interior.webp', cost: 22000 },
+    { id: 'waiter2',   type: 'worker', worker: 'waiter',   need: 25,  icon: IMG + 'up-interior.webp', cost: 2.2e5 },
+    { id: 'waiter3',   type: 'worker', worker: 'waiter',   need: 50,  icon: IMG + 'up-interior.webp', cost: 5.5e6 },
+    { id: 'waiter4',   type: 'worker', worker: 'waiter',   need: 100, icon: IMG + 'up-interior.webp', cost: 2.2e9 },
+    { id: 'icecream1', type: 'worker', worker: 'icecream', need: 10,  icon: IMG + 'up-cake.webp',     cost: 2.4e5 },
+    { id: 'icecream2', type: 'worker', worker: 'icecream', need: 25,  icon: IMG + 'up-cake.webp',     cost: 2.4e6 },
+    { id: 'icecream3', type: 'worker', worker: 'icecream', need: 50,  icon: IMG + 'up-cake.webp',     cost: 6e7 },
+    { id: 'icecream4', type: 'worker', worker: 'icecream', need: 100, icon: IMG + 'up-cake.webp',     cost: 2.4e10 },
+    { id: 'pastry1',   type: 'worker', worker: 'pastry',   need: 10,  icon: IMG + 'up-cake.webp',     cost: 2.6e6 },
+    { id: 'pastry2',   type: 'worker', worker: 'pastry',   need: 25,  icon: IMG + 'up-cake.webp',     cost: 2.6e7 },
+    { id: 'pastry3',   type: 'worker', worker: 'pastry',   need: 50,  icon: IMG + 'up-cake.webp',     cost: 6.5e8 },
+    { id: 'pastry4',   type: 'worker', worker: 'pastry',   need: 100, icon: IMG + 'up-cake.webp',     cost: 2.6e11 },
+    { id: 'sushi1',    type: 'worker', worker: 'sushi',    need: 10,  icon: IMG + 'up-interior.webp', cost: 2.8e7 },
+    { id: 'sushi2',    type: 'worker', worker: 'sushi',    need: 25,  icon: IMG + 'up-interior.webp', cost: 2.8e8 },
+    { id: 'sushi3',    type: 'worker', worker: 'sushi',    need: 50,  icon: IMG + 'up-interior.webp', cost: 7e9 },
+    { id: 'sushi4',    type: 'worker', worker: 'sushi',    need: 100, icon: IMG + 'up-interior.webp', cost: 2.8e12 },
+    { id: 'dj1',       type: 'worker', worker: 'dj',       need: 10,  icon: IMG + 'up-plant.webp',    cost: 4e8 },
+    { id: 'dj2',       type: 'worker', worker: 'dj',       need: 25,  icon: IMG + 'up-plant.webp',    cost: 4e9 },
+    { id: 'dj3',       type: 'worker', worker: 'dj',       need: 50,  icon: IMG + 'up-plant.webp',    cost: 1e11 },
+    { id: 'dj4',       type: 'worker', worker: 'dj',       need: 100, icon: IMG + 'up-plant.webp',    cost: 4e13 },
+    { id: 'chef1',     type: 'worker', worker: 'chef',     need: 10,  icon: IMG + 'up-showcase.webp', cost: 6.6e9 },
+    { id: 'chef2',     type: 'worker', worker: 'chef',     need: 25,  icon: IMG + 'up-showcase.webp', cost: 6.6e10 },
+    { id: 'chef3',     type: 'worker', worker: 'chef',     need: 50,  icon: IMG + 'up-showcase.webp', cost: 1.65e12 },
+    { id: 'chef4',     type: 'worker', worker: 'chef',     need: 100, icon: IMG + 'up-showcase.webp', cost: 6.6e14 }
   ],
 
-  // Редкие гости и коллекция
+  // Редкие гости и коллекция. Новый гость = спрайт в img/ + строка здесь + имя в I18N.guests
   guests: {
     minInterval: 60, maxInterval: 180,  // секунд между визитами
     stay: 10,                           // сколько секунд гость в кафе
@@ -565,39 +521,22 @@ const CONFIG = {
     preferNewChance: 0.6,               // шанс, что придёт ещё не открытый гость
     rarityWeights: { common: 65, rare: 28, legendary: 7 },
     list: [
-      { id: 'pirate',      icon: '😼', badge: '🏴‍☠️', rarity: 'common' },
-      { id: 'boots',       icon: '😺', badge: '👢', rarity: 'common' },
-      { id: 'coder',       icon: '🐱', badge: '💻', rarity: 'common' },
-      { id: 'artist',      icon: '😸', badge: '🎨', rarity: 'common' },
-      { id: 'fisher',      icon: '😻', badge: '🎣', rarity: 'common' },
-      { id: 'postman',     icon: '🐈', badge: '✉️', rarity: 'common' },
-      { id: 'gardener',    icon: '😽', badge: '🌻', rarity: 'common' },
-      { id: 'footballer',  icon: '😺', badge: '⚽', rarity: 'common' },
-      { id: 'tourist',     icon: '🐱', badge: '📷', rarity: 'common' },
-      { id: 'student',     icon: '😸', badge: '📚', rarity: 'common' },
-      { id: 'astronaut',   icon: '😺', badge: '🚀', rarity: 'rare' },
-      { id: 'detective',   icon: '😼', badge: '🔍', rarity: 'rare' },
-      { id: 'knight',      icon: '🐱', badge: '🛡️', rarity: 'rare' },
-      { id: 'magician',    icon: '😸', badge: '🎩', rarity: 'rare' },
-      { id: 'rockstar',    icon: '😻', badge: '🎸', rarity: 'rare' },
-      { id: 'ninja',       icon: '🐈‍⬛', badge: '🥷', rarity: 'rare' },
-      { id: 'king',        icon: '😼', badge: '👑', rarity: 'legendary' },
-      { id: 'wizard',      icon: '😺', badge: '🔮', rarity: 'legendary' },
-      { id: 'schrodinger', icon: '🙀', badge: '📦', rarity: 'legendary' },
-      { id: 'alien',       icon: '😽', badge: '👽', rarity: 'legendary' }
+      { id: 'fashion', icon: IMG + 'guest-fashion.webp', rarity: 'common' },
+      { id: 'panda',   icon: IMG + 'guest-panda.webp',   rarity: 'rare' },
+      { id: 'cool',    icon: IMG + 'guest-cool.webp',    rarity: 'legendary' }
     ]
   },
 
   // Престиж: звёзды = floor(sqrt(заработано_в_городе / starDivisor))
   prestige: { starDivisor: 1e6, starBonus: 0.10 },
 
-  // Города (по кругу при каждом престиже). bg — картинка фона стены вместо градиента
+  // Города (по кругу при каждом престиже): фон зала, CSS-фильтр и цветовая накладка (tint)
   cities: [
-    { id: 'catsville', icon: '🏡', bg: '', wall: ['#ffe9d2', '#ffd9b3'], floor: ['#c98b5a', '#b67747'], sky: ['#9fd8ff', '#e3f5ff'], decor: ['🫖', '🍪', '🥛'] },
-    { id: 'murmansk',  icon: '🚢', bg: '', wall: ['#e2f2ff', '#c4e2fb'], floor: ['#8fa7b8', '#7a93a6'], sky: ['#3d5a8c', '#a7c8ff'], decor: ['🐟', '🧣', '⛄'] },
-    { id: 'newyork',   icon: '🗽', bg: '', wall: ['#ffe2e8', '#ffc7d3'], floor: ['#6b5a7e', '#5a4a6c'], sky: ['#ffb199', '#ffe1a8'], decor: ['🥯', '🍩', '🌭'] },
-    { id: 'paris',     icon: '🗼', bg: '', wall: ['#f3e8ff', '#e2d0fb'], floor: ['#d9b48f', '#c79f78'], sky: ['#ffd1e8', '#fff0d6'], decor: ['🥖', '🧀', '🍷'] },
-    { id: 'tokyo',     icon: '🗻', bg: '', wall: ['#e6ffe9', '#c9f2d0'], floor: ['#a0705a', '#8a5d48'], sky: ['#ffc2d1', '#ffffff'], decor: ['🌸', '🍵', '🍡'] }
+    { id: 'catsville', bg: IMG + 'bg-cafe-1.webp', filter: 'none', tint: '' },
+    { id: 'murmansk',  bg: IMG + 'bg-cafe-2.webp', filter: 'saturate(.55) brightness(1.08)', tint: 'rgba(70, 140, 235, .55)' },
+    { id: 'newyork',   bg: IMG + 'bg-cafe-1.webp', filter: 'brightness(.9) saturate(1.05)', tint: 'rgba(90, 60, 190, .5)' },
+    { id: 'paris',     bg: IMG + 'bg-cafe-2.webp', filter: 'saturate(.9)', tint: 'rgba(255, 130, 190, .45)' },
+    { id: 'tokyo',     bg: IMG + 'bg-cafe-1.webp', filter: 'saturate(.85)', tint: 'rgba(110, 210, 150, .45)' }
   ],
 
   // Офлайн-доход
@@ -627,27 +566,34 @@ const CONFIG = {
   // Достижения: награда = max(reward, доход_в_секунду × rewardCpsSeconds)
   achievementCpsSeconds: 60,
   achievements: [
-    { id: 'first_cat',   icon: '🐾', type: 'workers',  n: 1,     reward: 50 },
-    { id: 'cats_10',     icon: '👥', type: 'workers',  n: 10,    reward: 500 },
-    { id: 'cats_50',     icon: '🏠', type: 'workers',  n: 50,    reward: 25000 },
-    { id: 'cats_100',    icon: '🏰', type: 'workers',  n: 100,   reward: 1e6 },
-    { id: 'taps_100',    icon: '👆', type: 'taps',     n: 100,   reward: 200 },
-    { id: 'taps_1000',   icon: '☕', type: 'taps',     n: 1000,  reward: 5000 },
-    { id: 'taps_10000',  icon: '💪', type: 'taps',     n: 10000, reward: 1e5 },
-    { id: 'earn_1k',     icon: '💰', type: 'earned',   n: 1e3,   reward: 300 },
-    { id: 'earn_1m',     icon: '💵', type: 'earned',   n: 1e6,   reward: 1e5 },
-    { id: 'earn_1b',     icon: '🏦', type: 'earned',   n: 1e9,   reward: 5e7 },
-    { id: 'earn_1t',     icon: '💎', type: 'earned',   n: 1e12,  reward: 5e10 },
-    { id: 'cps_100',     icon: '⚙️', type: 'cps',      n: 100,   reward: 20000 },
-    { id: 'cps_10k',     icon: '🚂', type: 'cps',      n: 1e4,   reward: 2e6 },
-    { id: 'guest_1',     icon: '🔔', type: 'guests',   n: 1,     reward: 500 },
-    { id: 'guests_10',   icon: '📖', type: 'guests',   n: 10,    reward: 5e5 },
-    { id: 'guests_20',   icon: '🌟', type: 'guests',   n: 20,    reward: 1e9 },
-    { id: 'prestige_1',  icon: '🧳', type: 'prestige', n: 1,     reward: 1e6 },
-    { id: 'prestige_5',  icon: '🌍', type: 'prestige', n: 5,     reward: 1e9 },
-    { id: 'upgrades_10', icon: '🔧', type: 'upgrades', n: 10,    reward: 10000 },
-    { id: 'daily_7',     icon: '📅', type: 'streak',   n: 7,     reward: 1e6 }
+    { id: 'first_cat',   icon: IMG + 'cat-barista.webp',   type: 'workers',    n: 1,     reward: 50 },
+    { id: 'cats_10',     icon: IMG + 'cat-baker.webp',     type: 'workers',    n: 10,    reward: 500 },
+    { id: 'cats_50',     icon: IMG + 'cat-waiter.webp',    type: 'workers',    n: 50,    reward: 25000 },
+    { id: 'cats_100',    icon: IMG + 'cat-chef.webp',      type: 'workers',    n: 100,   reward: 1e6 },
+    { id: 'taps_100',    icon: IMG + 'machine.webp',       type: 'taps',       n: 100,   reward: 200 },
+    { id: 'taps_1000',   icon: IMG + 'machine.webp',       type: 'taps',       n: 1000,  reward: 5000 },
+    { id: 'taps_10000',  icon: IMG + 'machine.webp',       type: 'taps',       n: 10000, reward: 1e5 },
+    { id: 'earn_1k',     icon: IMG + 'coin.webp',          type: 'earned',     n: 1e3,   reward: 300 },
+    { id: 'earn_1m',     icon: IMG + 'coin.webp',          type: 'earned',     n: 1e6,   reward: 1e5 },
+    { id: 'earn_1b',     icon: IMG + 'coin.webp',          type: 'earned',     n: 1e9,   reward: 5e7 },
+    { id: 'earn_1t',     icon: IMG + 'coin.webp',          type: 'earned',     n: 1e12,  reward: 5e10 },
+    { id: 'cps_100',     icon: IMG + 'cat-pastry.webp',    type: 'cps',        n: 100,   reward: 20000 },
+    { id: 'cps_10k',     icon: IMG + 'cat-dj.webp',        type: 'cps',        n: 1e4,   reward: 2e6 },
+    { id: 'guest_1',     icon: IMG + 'guest-fashion.webp', type: 'guests',     n: 1,     reward: 500 },
+    { id: 'guests_25',   icon: IMG + 'guest-panda.webp',   type: 'catches',    n: 25,    reward: 5e5 },
+    { id: 'guests_all',  icon: IMG + 'guest-cool.webp',    type: 'collection', n: 1,     reward: 1e9 },
+    { id: 'prestige_1',  icon: IMG + 'star.webp',          type: 'prestige',   n: 1,     reward: 1e6 },
+    { id: 'prestige_5',  icon: IMG + 'star.webp',          type: 'prestige',   n: 5,     reward: 1e9 },
+    { id: 'upgrades_10', icon: IMG + 'up-interior.webp',   type: 'upgrades',   n: 10,    reward: 10000 },
+    { id: 'daily_7',     icon: IMG + 'up-cake.webp',       type: 'streak',     n: 7,     reward: 1e6 }
   ]
+};
+
+// Значки интерфейса без отдельных спрайтов (векторные, не эмодзи)
+const SVG = {
+  ad: '<svg class="ui" viewBox="0 0 24 24"><path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm6 4v8l6-4z"/></svg>',
+  soundOn: '<svg class="ui" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/></svg>',
+  soundOff: '<svg class="ui" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm18.4 6L19 12.6 21.4 10 20 8.6l-2.4 2.4-2.4-2.4L13.8 10l2.4 2.6-2.4 2.4 1.4 1.4 2.4-2.4 2.4 2.4z"/></svg>'
 };
 
 /* =====================================================================
@@ -667,41 +613,41 @@ const I18N = {
     noUpgrades: 'Все доступные улучшения куплены. Нанимайте котов дальше!',
     upgradesTitle: 'Улучшения',
     tapNow: 'Тап сейчас: +{x}',
-    prestigeTitle: '🏙️ Открыть кафе в новом городе',
-    prestigeStars: 'Звёзды Мяушлен: {s} ⭐ (+{b}% к доходу)',
+    prestigeTitle: 'Открыть кафе в новом городе',
+    prestigeStars: 'Звёзды Мяушлен: {s} {star} (+{b}% к доходу)',
     prestigeEarned: 'Заработано в этом городе: {x}',
-    prestigeGain: 'При переезде: +{n} ⭐',
+    prestigeGain: 'При переезде: +{n} {star}',
     prestigeNext: 'Следующая звезда при {x}',
     prestigeFirst: 'Первая звезда при {x} заработанных в городе',
     prestigeBtn: 'Переехать: {city}',
     prestigeConfirmTitle: 'Переезжаем в {city}?',
-    prestigeConfirmText: 'Монеты, сотрудники и улучшения сбросятся. Вы получите <b>{n} ⭐</b> (+{b}% к доходу навсегда). Коллекция и достижения останутся с вами.',
+    prestigeConfirmText: 'Монеты, сотрудники и улучшения сбросятся. Вы получите <b>{n} {star}</b> (+{b}% к доходу навсегда). Коллекция и достижения останутся с вами.',
     confirm: 'Переезжаем!', cancel: 'Остаться',
     welcomeCity: 'Добро пожаловать: {city}!',
     welcomeCityText: 'Звёзд Мяушлен: {s}. Доход +{b}% навсегда. Коты уже распаковывают фартуки!',
     collectionHead: 'Открыто гостей: {n}/{total} · +{b}% к доходу',
     collectionHint: 'Ловите редких гостей в зале: они заходят раз в 1–3 минуты.',
-    rarity_common: 'Обычные', rarity_rare: 'Редкие', rarity_legendary: 'Легендарные',
+    rarity_common: 'Обычный', rarity_rare: 'Редкий', rarity_legendary: 'Легендарный',
     caught: 'Встречен: {n}',
     achHead: 'Получено: {n}/{total}',
     achReward: '+{x}',
-    achUnlocked: '🏆 {name} · +{x}',
+    achUnlocked: '{name} · +{x}',
     offlineTitle: 'С возвращением!',
     offlineText: 'Пока вас не было ({time}), коты заработали:',
     collect: 'Забрать {x}',
-    triple: '📺 Утроить: {x}',
+    triple: '{ad} Утроить: {x}',
     dailyTitle: 'Ежедневная награда',
     dailyText: 'Заходите каждый день! На 7-й день придёт редкий гость.',
     day: 'День {n}', claim: 'Забрать', dailyGuest: 'Гость!',
     dailyClaimed: 'Награда дня: +{x}',
-    rushBtn: '📺 Час пик ×2', rushActive: '🔥 ×2 {t}',
-    guestBtn: '📺 Позвать гостя', guestWait: '🔔 {t}', guestHereBtn: '🔔 Гость в зале!',
-    rushStarted: '🔥 Час пик! Доход ×2 на 5 минут',
-    frenzy: '✨ ×7 {t}',
-    guestArrived: '🔔 В кафе заглянул гость! Скорее тапните по нему',
+    rushBtn: '{ad} Час пик ×2', rushActive: 'Час пик ×2 · {t}',
+    guestBtn: '{ad} Позвать гостя', guestWait: 'Гость через {t}', guestHereBtn: 'Гость в зале!',
+    rushStarted: 'Час пик! Доход ×2 на 5 минут',
+    frenzy: '{star} ×7 {t}',
+    guestArrived: 'В кафе заглянул гость! Скорее тапните по нему',
     guestCoins: '{name}: +{x}!',
     guestFrenzy: '{name}: доход ×7 на 30 секунд!',
-    guestNew: '📖 Новый гость в коллекции! +1% к доходу',
+    guestNew: 'Новый гость в коллекции! +1% к доходу',
     guestLeft: 'Гость ушёл… Ждите следующего!',
     adError: 'Реклама сейчас недоступна, попробуйте позже',
     adStub: 'Реклама (заглушка)',
@@ -726,13 +672,7 @@ const I18N = {
       dj1: 'Наушники с ушками', dj2: 'Пульт из клубка', dj3: 'Ремикс мурчания', dj4: 'Диско-шар из фольги',
       chef1: 'Высокий колпак шефа', chef2: 'Половник судьбы', chef3: 'Звёздное меню', chef4: 'Усы Мяушлен'
     },
-    guests: {
-      pirate: 'Кот-пират', boots: 'Кот в сапогах', coder: 'Кот-программист', artist: 'Кот-художник',
-      fisher: 'Кот-рыбак', postman: 'Кот-почтальон', gardener: 'Кот-садовник', footballer: 'Кот-футболист',
-      tourist: 'Кот-турист', student: 'Кот-студент', astronaut: 'Кот-космонавт', detective: 'Кот-детектив',
-      knight: 'Кот-рыцарь', magician: 'Кот-фокусник', rockstar: 'Кот-рок-звезда', ninja: 'Кот-ниндзя',
-      king: 'Кот-король', wizard: 'Кот-волшебник', schrodinger: 'Кот Шрёдингера', alien: 'Кот с Марса'
-    },
+    guests: { fashion: 'Кошечка-модница', panda: 'Панда-путешественник', cool: 'Крутой кот в золоте' },
     cities: { catsville: 'Котоград', murmansk: 'Мурманск', newyork: 'Мяу-Йорк', paris: 'Пурриж', tokyo: 'Токимяу' },
     achievements: {
       first_cat:   ['Первый сотрудник', 'Наймите первого кота'],
@@ -749,8 +689,8 @@ const I18N = {
       cps_100:     ['Само мурлычется', 'Доход 100 монет в секунду'],
       cps_10k:     ['Мурчащий конвейер', 'Доход 10K монет в секунду'],
       guest_1:     ['Добро пожаловать!', 'Встретьте первого редкого гостя'],
-      guests_10:   ['Звёздные гости', 'Откройте 10 гостей в коллекции'],
-      guests_20:   ['Полный зал', 'Соберите всю коллекцию гостей'],
+      guests_25:   ['Звёздные гости', 'Встретьте редких гостей 25 раз'],
+      guests_all:  ['Полный зал', 'Соберите всю коллекцию гостей'],
       prestige_1:  ['Переезд', 'Откройте кафе в новом городе'],
       prestige_5:  ['Кругосветка', 'Откройте кафе в новом городе 5 раз'],
       upgrades_10: ['Модернизация', 'Купите 10 улучшений'],
@@ -770,15 +710,15 @@ const I18N = {
     noUpgrades: 'All available upgrades bought. Keep hiring cats!',
     upgradesTitle: 'Upgrades',
     tapNow: 'Tap now: +{x}',
-    prestigeTitle: '🏙️ Open a café in a new city',
-    prestigeStars: 'Meowchelin stars: {s} ⭐ (+{b}% income)',
+    prestigeTitle: 'Open a café in a new city',
+    prestigeStars: 'Meowchelin stars: {s} {star} (+{b}% income)',
     prestigeEarned: 'Earned in this city: {x}',
-    prestigeGain: 'Move now: +{n} ⭐',
+    prestigeGain: 'Move now: +{n} {star}',
     prestigeNext: 'Next star at {x}',
     prestigeFirst: 'First star at {x} earned in this city',
     prestigeBtn: 'Move to {city}',
     prestigeConfirmTitle: 'Move to {city}?',
-    prestigeConfirmText: 'Coins, staff and upgrades will be reset. You will get <b>{n} ⭐</b> (+{b}% income forever). Collection and achievements stay with you.',
+    prestigeConfirmText: 'Coins, staff and upgrades will be reset. You will get <b>{n} {star}</b> (+{b}% income forever). Collection and achievements stay with you.',
     confirm: 'Let\'s go!', cancel: 'Stay',
     welcomeCity: 'Welcome to {city}!',
     welcomeCityText: 'Meowchelin stars: {s}. Income +{b}% forever. The cats are unpacking their aprons!',
@@ -788,23 +728,23 @@ const I18N = {
     caught: 'Met: {n}',
     achHead: 'Unlocked: {n}/{total}',
     achReward: '+{x}',
-    achUnlocked: '🏆 {name} · +{x}',
+    achUnlocked: '{name} · +{x}',
     offlineTitle: 'Welcome back!',
     offlineText: 'While you were away ({time}), the cats earned:',
     collect: 'Collect {x}',
-    triple: '📺 Triple it: {x}',
+    triple: '{ad} Triple it: {x}',
     dailyTitle: 'Daily reward',
     dailyText: 'Come back every day! On day 7 a rare guest arrives.',
     day: 'Day {n}', claim: 'Claim', dailyGuest: 'Guest!',
     dailyClaimed: 'Daily reward: +{x}',
-    rushBtn: '📺 Rush hour ×2', rushActive: '🔥 ×2 {t}',
-    guestBtn: '📺 Invite a guest', guestWait: '🔔 {t}', guestHereBtn: '🔔 Guest is here!',
-    rushStarted: '🔥 Rush hour! Income ×2 for 5 minutes',
-    frenzy: '✨ ×7 {t}',
-    guestArrived: '🔔 A guest dropped by! Tap it quickly',
+    rushBtn: '{ad} Rush hour ×2', rushActive: 'Rush hour ×2 · {t}',
+    guestBtn: '{ad} Invite a guest', guestWait: 'Guest in {t}', guestHereBtn: 'Guest is here!',
+    rushStarted: 'Rush hour! Income ×2 for 5 minutes',
+    frenzy: '{star} ×7 {t}',
+    guestArrived: 'A guest dropped by! Tap it quickly',
     guestCoins: '{name}: +{x}!',
     guestFrenzy: '{name}: income ×7 for 30 seconds!',
-    guestNew: '📖 New guest in the collection! +1% income',
+    guestNew: 'New guest in the collection! +1% income',
     guestLeft: 'The guest left… Wait for the next one!',
     adError: 'Ads are not available right now, try later',
     adStub: 'Advertisement (stub)',
@@ -829,13 +769,7 @@ const I18N = {
       dj1: 'Cat-Ear Headphones', dj2: 'Yarn Ball Turntable', dj3: 'Purr Remix', dj4: 'Tinfoil Disco Ball',
       chef1: 'Tall Chef\'s Hat', chef2: 'Ladle of Destiny', chef3: 'Starry Menu', chef4: 'Meowchelin Whiskers'
     },
-    guests: {
-      pirate: 'Pirate Cat', boots: 'Puss in Boots', coder: 'Coder Cat', artist: 'Artist Cat',
-      fisher: 'Fisher Cat', postman: 'Postman Cat', gardener: 'Gardener Cat', footballer: 'Footballer Cat',
-      tourist: 'Tourist Cat', student: 'Student Cat', astronaut: 'Astronaut Cat', detective: 'Detective Cat',
-      knight: 'Knight Cat', magician: 'Magician Cat', rockstar: 'Rock Star Cat', ninja: 'Ninja Cat',
-      king: 'King Cat', wizard: 'Wizard Cat', schrodinger: 'Schrödinger\'s Cat', alien: 'Cat from Mars'
-    },
+    guests: { fashion: 'Fashionista Cat', panda: 'Panda Traveler', cool: 'Golden Cool Cat' },
     cities: { catsville: 'Catsville', murmansk: 'Meowmansk', newyork: 'New Meowk', paris: 'Purris', tokyo: 'Meowkyo' },
     achievements: {
       first_cat:   ['First Employee', 'Hire your first cat'],
@@ -852,8 +786,8 @@ const I18N = {
       cps_100:     ['It Purrs Itself', 'Reach 100 coins per second'],
       cps_10k:     ['Purring Conveyor', 'Reach 10K coins per second'],
       guest_1:     ['Welcome!', 'Meet your first rare guest'],
-      guests_10:   ['Star Guests', 'Find 10 guests for the collection'],
-      guests_20:   ['Full House', 'Complete the guest collection'],
+      guests_25:   ['Star Guests', 'Meet rare guests 25 times'],
+      guests_all:  ['Full House', 'Complete the guest collection'],
       prestige_1:  ['Relocation', 'Open a café in a new city'],
       prestige_5:  ['World Tour', 'Open a café in a new city 5 times'],
       upgrades_10: ['Modernization', 'Buy 10 upgrades'],
@@ -922,12 +856,16 @@ function todayStr(d) {
   return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
 }
 
-// Иконка: эмодзи или картинка + необязательный значок
+// Иконка: картинка или эмодзи + необязательный значок
 function iconPart(src, cls) {
   if (!src) return '';
-  if (/\.(png|jpe?g|gif|svg|webp)(\?.*)?$/i.test(src)) return `<img class="${cls}" src="${src}" alt="">`;
+  if (/\.(png|jpe?g|gif|svg|webp)(\?.*)?$/i.test(src)) return `<img class="${cls}" src="${src}" alt="" draggable="false">`;
   return `<span class="${cls}">${src}</span>`;
 }
+// Монета и звезда внутри текста
+const coinImg = () => iconPart(CONFIG.coinIcon, 'ci');
+const starImg = () => iconPart(CONFIG.starIcon, 'ci');
+const coinsHTML = n => coinImg() + ' ' + fmt(n);
 function renderIcon(icon, badge, extraCls) {
   return `<span class="ic ${extraCls || ''}">${iconPart(icon, 'emo')}${iconPart(badge, 'bdg')}</span>`;
 }
@@ -943,7 +881,11 @@ function t(key, params) {
   let v = lookup(LANG, key);
   if (v === undefined) v = lookup('ru', key);
   if (v === undefined) { console.warn('[i18n] нет текста', key); return key; }
-  if (params && typeof v === 'string') v = v.replace(/\{(\w+)\}/g, (m, k) => (params[k] !== undefined ? params[k] : m));
+  if (typeof v === 'string' && v.indexOf('{') >= 0) {
+    // {star}, {coin}, {ad} — значки-картинки, доступны в любом тексте
+    const p = Object.assign({ star: starImg(), coin: coinImg(), ad: SVG.ad }, params);
+    v = v.replace(/\{(\w+)\}/g, (m, k) => (p[k] !== undefined ? p[k] : m));
+  }
   return v;
 }
 function detectLang(code) {
@@ -1332,27 +1274,15 @@ function resizeHall() {
 }
 
 function renderMachine() {
-  const m = CONFIG.machine;
-  $('#machine').innerHTML = m.image
-    ? `<img src="${m.image}" alt="">`
-    : `<div class="m-top"></div>
-       <div class="m-body"><div class="m-panel"><i class="m-light"></i><i class="m-light b"></i></div><div class="m-logo">${iconPart(m.logo, 'emo')}</div></div>
-       <div class="m-nozzle"></div><div class="m-base"></div>
-       <div class="steam s1"></div><div class="steam s2"></div>
-       <div class="m-cup">${iconPart(m.icon, 'emo')}</div>`;
+  $('#machine').innerHTML = iconPart(CONFIG.machine.icon, 'm-img') + '<div class="steam s1"></div><div class="steam s2"></div>';
 }
 
 function applyCity() {
   const c = cityOf(S.prestigeCount);
-  hall.style.setProperty('--wall1', c.wall[0]);
-  hall.style.setProperty('--wall2', c.wall[1]);
-  hall.style.setProperty('--floor1', c.floor[0]);
-  hall.style.setProperty('--floor2', c.floor[1]);
-  hall.style.setProperty('--sky1', c.sky[0]);
-  hall.style.setProperty('--sky2', c.sky[1]);
-  $('.wall').style.backgroundImage = c.bg ? `url("${c.bg}")` : '';
-  $('#cityIcon').innerHTML = renderIcon(c.icon);
-  $('#shelf').innerHTML = c.decor.map(d => iconPart(d, 'emo')).join('');
+  const bg = $('#hallBg');
+  bg.style.backgroundImage = c.bg ? `url("${c.bg}")` : '';
+  bg.style.filter = c.filter || 'none';
+  $('#hallTint').style.background = c.tint || 'transparent';
   $('#signTitle').textContent = t('title');
   $('#signCity').textContent = cityName(c);
 }
@@ -1377,8 +1307,8 @@ function renderHallCats() {
     const rng = mulberry32((x.i + 1) * 7919 + x.k * 104729 + S.prestigeCount * 31);
     let px = 50, py = 90;
     for (let tries = 0; tries < 40; tries++) {
-      px = 5 + rng() * 90; py = 62 + rng() * 30;
-      if (!(px > 20 && px < 80 && py < 80)) break; // не ставим котов за стойку
+      px = 5 + rng() * 90; py = 64 + rng() * 30;
+      if (px < 28 || px > 72) break; // центр зала — для кофемашины
     }
     const w = CONFIG.workers[x.i];
     const el = document.createElement('div');
@@ -1386,14 +1316,14 @@ function renderHallCats() {
     el.style.left = px.toFixed(1) + '%';
     el.style.top = py.toFixed(1) + '%';
     el.style.zIndex = String(Math.round(py));
-    el.style.setProperty('--s', (0.8 + (py - 62) / 30 * 0.35).toFixed(2));
-    el.innerHTML = `<span class="body">${renderIcon(w.icon, w.badge)}</span><span class="shadow"></span>`;
+    el.style.setProperty('--s', (0.8 + (py - 64) / 30 * 0.3).toFixed(2));
+    el.innerHTML = `<span class="body">${renderIcon(w.icon)}</span><span class="shadow"></span>`;
     el.firstChild.style.animationDelay = (-rng() * 5).toFixed(2) + 's';
     el.addEventListener('pointerdown', e => {
       e.preventDefault();
       if (Game.paused) return;
       Sound.play('meow');
-      spawnFx('fx-heart', e.clientX, e.clientY, '❤️');
+      spawnFx('fx-heart', e.clientX, e.clientY, iconPart(CONFIG.ui.catFx, 'emo'));
     });
     if (Game.started) setTimeout(() => el.classList.remove('pop'), 600);
     layer.appendChild(el);
@@ -1430,9 +1360,9 @@ function tapMachine(clientX, clientY) {
     { transform: 'translateX(-50%) scale(1, 1)' }
   ], { duration: 130, easing: 'ease-out' });
   const r = m.getBoundingClientRect();
-  const cupX = r.left + r.width / 2, cupY = r.top + r.height * 0.8;
+  const cupX = r.left + r.width * 0.42, cupY = r.top + r.height * 0.6;
   const u = parseFloat(getComputedStyle(hall).getPropertyValue('--u')) || 4;
-  spawnFx('fx-cup', cupX, cupY, iconPart(CONFIG.machine.icon, 'emo'), {
+  spawnFx('fx-cup', cupX, cupY, iconPart(CONFIG.ui.tapFx, 'emo'), {
     '--dx': (rand(-1, 1) * u * 25).toFixed(0) + 'px',
     '--dy': (-u * rand(14, 26)).toFixed(0) + 'px',
     '--rot': rand(-200, 200).toFixed(0) + 'deg'
@@ -1466,7 +1396,7 @@ function spawnGuest(minRarity) {
   el.className = 'guest ' + g.rarity;
   el.style.left = (Math.random() < 0.5 ? rand(10, 22) : rand(78, 90)).toFixed(1) + '%';
   el.style.top = rand(68, 86).toFixed(1) + '%';
-  el.innerHTML = `<span class="body">${renderIcon(g.icon, g.badge)}</span><span class="spark">✨</span><span class="gtime"></span>`;
+  el.innerHTML = `<span class="body">${renderIcon(g.icon)}</span>${iconPart(CONFIG.starIcon, 'spark')}<span class="gtime"></span>`;
   el.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); catchGuest(); });
   $('#guestLayer').appendChild(el);
   guest = { g, left: CONFIG.guests.stay, el };
@@ -1502,10 +1432,10 @@ function catchGuest() {
   } else {
     const coins = Math.max(D.baseCps * CONFIG.guests.coinsSeconds, tapValue() * CONFIG.guests.minCoinsTaps);
     earn(coins);
-    toast(t('guestCoins', { name, x: fmt(coins) }), 'gold');
+    toast(t('guestCoins', { name, x: coinsHTML(coins) }), 'gold');
   }
   if (isNew) { setTimeout(() => toast(t('guestNew'), 'blue'), 300); UI.newGuests++; }
-  spawnFx('fx-num', r.left + r.width / 2, r.top, renderIcon(g.icon, g.badge));
+  spawnFx('fx-num', r.left + r.width / 2, r.top, renderIcon(g.icon));
   Sound.play('meow');
   setTimeout(() => Sound.play('coin'), 200);
   UI.dirty.collection = true;
@@ -1590,7 +1520,7 @@ function askPrestige() {
   if (n < 1 || SDK.adActive) return;
   const next = cityOf(S.prestigeCount + 1);
   Modal.show({
-    icon: renderIcon(next.icon),
+    icon: iconPart(CONFIG.starIcon, 'emo'),
     title: t('prestigeConfirmTitle', { city: cityName(next) }),
     html: `<p>${t('prestigeConfirmText', { n, b: Math.round((S.stars + n) * CONFIG.prestige.starBonus * 100) })}</p>`,
     buttons: [
@@ -1620,7 +1550,7 @@ function doPrestige() {
   // Межстраничная реклама при престиже, затем приветствие в новом городе
   SDK.showFullscreen(() => {
     Modal.show({
-      icon: renderIcon(city.icon),
+      icon: iconPart(CONFIG.starIcon, 'emo'),
       title: t('welcomeCity', { city: cityName(city) }),
       html: `<p>${t('welcomeCityText', { s: S.stars, b: Math.round(S.stars * CONFIG.prestige.starBonus * 100) })}</p>`
     });
@@ -1637,6 +1567,8 @@ function achStat(type) {
     case 'earned': return S.allTimeEarned;
     case 'cps': return D.baseCps;
     case 'guests': return guestsFound();
+    case 'catches': return S.stats.guestsCaught;
+    case 'collection': return guestsFound() / CONFIG.guests.list.length; // 1 = собрана вся коллекция
     case 'prestige': return S.prestigeCount;
     case 'upgrades': return S.stats.upgradesBought;
     case 'streak': return S.stats.bestStreak;
@@ -1651,7 +1583,7 @@ function checkAchievements() {
     S.achievements[a.id] = true;
     const reward = achReward(a);
     earn(reward, true);
-    toast(t('achUnlocked', { name: t('achievements.' + a.id)[0], x: fmt(reward) }), 'gold');
+    toast(t('achUnlocked', { name: t('achievements.' + a.id)[0], x: coinsHTML(reward) }), 'gold');
     Sound.play('achieve');
     UI.newAch++;
     UI.dirty.achievements = true;
@@ -1675,10 +1607,10 @@ function checkDaily() {
   const cells = CONFIG.daily.days.map((d, i) => {
     const n = i + 1;
     const cls = n < day ? 'done' : (n === day ? 'today' : '');
-    return `<div class="dcell ${cls}"><div>${t('day', { n })}</div><div class="di">${d.guest ? '🎁' : CONFIG.coinIcon}</div><div class="da">${fmt(dailyReward(i))}</div>${d.guest ? `<div class="dg">+ ${t('dailyGuest')}</div>` : ''}</div>`;
+    return `<div class="dcell ${cls}"><div>${t('day', { n })}</div><div class="di">${iconPart(d.guest ? CONFIG.ui.dailyGuest : CONFIG.coinIcon, 'emo')}</div><div class="da">${fmt(dailyReward(i))}</div>${d.guest ? `<div class="dg">+ ${t('dailyGuest')}</div>` : ''}</div>`;
   }).join('');
   Modal.show({
-    icon: '📅',
+    icon: iconPart(CONFIG.ui.daily, 'emo'),
     title: t('dailyTitle'),
     html: `<p>${t('dailyText')}</p><div class="daily">${cells}</div>`,
     buttons: [{ text: t('claim'), cls: 'primary', onClick: () => { claimDaily(day); } }]
@@ -1692,7 +1624,7 @@ function claimDaily(day) {
   S.stats.bestStreak = Math.max(S.stats.bestStreak, day);
   const coins = dailyReward(day - 1);
   earn(coins, true);
-  toast(t('dailyClaimed', { x: fmt(coins) }), 'gold');
+  toast(t('dailyClaimed', { x: coinsHTML(coins) }), 'gold');
   Sound.play('coin');
   // 7-й день — гарантированный редкий (или легендарный) гость
   if (CONFIG.daily.days[day - 1].guest) setTimeout(() => spawnGuest('rare'), 600);
@@ -1709,9 +1641,9 @@ function offlineEarnings(sec) {
 function showOffline(sec, amount) {
   let done = false;
   const o = {
-    icon: '😴',
+    icon: iconPart(CONFIG.ui.offline, 'emo'),
     title: t('offlineTitle'),
-    html: `<p>${t('offlineText', { time: fmtDuration(Math.min(sec, CONFIG.offline.maxSeconds)) })}</p><div class="big-amount">${CONFIG.coinIcon} ${fmt(amount)}</div>`,
+    html: `<p>${t('offlineText', { time: fmtDuration(Math.min(sec, CONFIG.offline.maxSeconds)) })}</p><div class="big-amount">${coinsHTML(amount)}</div>`,
     buttons: [
       {
         text: t('triple', { x: fmt(amount * CONFIG.ads.offlineMult) }), cls: 'ad',
@@ -1768,7 +1700,7 @@ const UI = {
   refs: {}
 };
 const setText = (el, s) => { if (el && el.textContent !== s) el.textContent = s; };
-const setHTML = (el, s) => { if (el && el.innerHTML !== s) el.innerHTML = s; };
+const setHTML = (el, s) => { if (el && el._html !== s) { el._html = s; el.innerHTML = s; } };
 
 function switchTab(tab) {
   UI.tab = tab;
@@ -1788,13 +1720,13 @@ function buildCats() {
     const w = CONFIG.workers[i];
     if (i < S.revealed) {
       html += `<div class="row" id="w${i}">
-        <div class="ricon">${renderIcon(w.icon, w.badge)}</div>
+        <div class="ricon">${renderIcon(w.icon)}</div>
         <div class="rinfo"><div class="rname">${workerName(i)}<span class="cnt"></span></div><div class="rsub"></div></div>
-        <button class="buy" data-buy="${i}"><small></small><span></span></button></div>`;
+        <button class="buy" data-buy="${i}"><small></small>${coinImg()} <span></span></button></div>`;
     } else {
       html += `<div class="row locked" id="w${i}">
-        <div class="ricon">${renderIcon(w.icon, w.badge, 'sil')}</div>
-        <div class="rinfo"><div class="rname">${t('unknownWorker')}</div><div class="rsub">${t('revealAt', { x: CONFIG.coinIcon + ' ' + fmt(costFor(i, 1) * CONFIG.revealFraction) })}</div></div></div>`;
+        <div class="ricon">${renderIcon(w.icon, '', 'sil')}</div>
+        <div class="rinfo"><div class="rname">${t('unknownWorker')}</div><div class="rsub">${t('revealAt', { x: coinsHTML(costFor(i, 1) * CONFIG.revealFraction) })}</div></div></div>`;
       break;
     }
   }
@@ -1814,7 +1746,7 @@ function updateCats() {
     setText(r.cnt, S.workers[i] ? ' ×' + S.workers[i] : '');
     setText(r.sub, t('perCat', { x: fmt(unit, true) }) + (S.workers[i] ? ' · ' + t('totalIncome', { x: fmt(unit * S.workers[i], true) }) : ''));
     setText(r.q, 'x' + n);
-    setText(r.c, CONFIG.coinIcon + ' ' + fmt(Math.ceil(cost)));
+    setText(r.c, fmt(Math.ceil(cost)));
     r.btn.disabled = S.coins < cost;
   }
 }
@@ -1836,14 +1768,14 @@ function buildUpgrades() {
   for (const { u, locked } of vis) {
     const isTap = u.type === 'tap';
     const wi = isTap ? -1 : WORKER_INDEX[u.worker];
-    const icon = isTap ? renderIcon(u.icon, CONFIG.machine.icon) : renderIcon(u.icon, CONFIG.workers[wi].icon);
+    const icon = isTap ? renderIcon(u.icon) : renderIcon(u.icon, CONFIG.workers[wi].icon);
     const desc = locked
       ? t('needWorkers', { n: u.need, name: workerName(wi), have: S.workers[wi] })
       : (isTap ? t('tapUpDesc') : t('workerUpDesc', { name: workerName(wi) }));
     html += `<div class="row ${locked ? 'locked' : ''}">
       <div class="ricon">${icon}</div>
       <div class="rinfo"><div class="rname">${t('upgrades.' + u.id)}</div><div class="rsub">${desc}</div></div>
-      <button class="buy" data-up="${u.id}" ${locked ? 'disabled' : ''}>${CONFIG.coinIcon} ${fmt(u.cost)}</button></div>`;
+      <button class="buy" data-up="${u.id}" ${locked ? 'disabled' : ''}>${coinsHTML(u.cost)}</button></div>`;
   }
   p.innerHTML = html + '</div>';
   UI.refs.up = {
@@ -1856,10 +1788,10 @@ function updateUpgrades() {
   if (key !== UI.keys.upgradesList) buildUpgrades();
   const r = UI.refs.up;
   const n = pendingStars();
-  setText(r.stars, t('prestigeStars', { s: S.stars, b: Math.round(S.stars * CONFIG.prestige.starBonus * 100) }));
+  setHTML(r.stars, t('prestigeStars', { s: S.stars, b: Math.round(S.stars * CONFIG.prestige.starBonus * 100) }));
   setText(r.earned, t('prestigeEarned', { x: fmt(S.runEarned) }));
   const nextAt = Math.pow(n + 1, 2) * CONFIG.prestige.starDivisor;
-  setText(r.gain, n >= 1 ? t('prestigeGain', { n }) + ' · ' + t('prestigeNext', { x: fmt(nextAt) }) : t('prestigeFirst', { x: fmt(nextAt) }));
+  setHTML(r.gain, n >= 1 ? t('prestigeGain', { n }) + ' · ' + t('prestigeNext', { x: fmt(nextAt) }) : t('prestigeFirst', { x: fmt(nextAt) }));
   setText(r.btn, t('prestigeBtn', { city: cityName(cityOf(S.prestigeCount + 1)) }));
   r.btn.disabled = n < 1;
   setText(r.tapNow, t('tapNow', { x: fmt(tapValue(), true) }));
@@ -1874,16 +1806,17 @@ function buildCollection() {
   const p = $('#page-collection');
   const found = guestsFound(), total = CONFIG.guests.list.length;
   let html = `<div class="col-head">${t('collectionHead', { n: found, total, b: Math.round(found * CONFIG.guests.collectionBonus * 100) })}</div>`;
-  for (const rar of RARITIES) {
-    html += `<div class="sec-title rar-${rar}">${t('rarity_' + rar)}</div><div class="grid">`;
-    for (const g of CONFIG.guests.list.filter(x => x.rarity === rar)) {
-      const c = S.guests[g.id] || 0;
-      html += c
-        ? `<div class="gcard ${rar}"><div class="gi">${renderIcon(g.icon, g.badge)}</div><div class="gn">${t('guests.' + g.id)}</div><div class="gc">${t('caught', { n: c })}</div></div>`
-        : `<div class="gcard unknown"><div class="gi">${renderIcon(g.icon, g.badge, 'sil')}</div><div class="gn">???</div><div class="gc">&nbsp;</div></div>`;
-    }
-    html += '</div>';
+  // Одна сетка, отсортированная по редкости; редкость подписана на карточке
+  const list = [...CONFIG.guests.list].sort((a, b) => RARITIES.indexOf(a.rarity) - RARITIES.indexOf(b.rarity));
+  html += '<div class="grid">';
+  for (const g of list) {
+    const c = S.guests[g.id] || 0;
+    const rar = `<div class="gr rar-${g.rarity}">${t('rarity_' + g.rarity)}</div>`;
+    html += c
+      ? `<div class="gcard ${g.rarity}">${rar}<div class="gi">${renderIcon(g.icon)}</div><div class="gn">${t('guests.' + g.id)}</div><div class="gc">${t('caught', { n: c })}</div></div>`
+      : `<div class="gcard unknown">${rar}<div class="gi">${renderIcon(g.icon, '', 'sil')}</div><div class="gn">???</div><div class="gc">&nbsp;</div></div>`;
   }
+  html += '</div>';
   p.innerHTML = html + `<div class="hint">${t('collectionHint')}</div>`;
 }
 
@@ -1897,7 +1830,7 @@ function buildAchievements() {
     const [name, desc] = t('achievements.' + a.id);
     html += `<div class="row ach ${done ? 'done' : 'locked'}" data-ach="${a.id}">
       <div class="ricon">${iconPart(a.icon, 'emo')}</div>
-      <div class="rinfo"><div class="rname">${done ? '✔ ' : ''}${name}</div><div class="rsub">${desc}</div>${done ? '' : '<div class="bar"><i></i></div>'}</div>
+      <div class="rinfo"><div class="rname">${done ? '✓ ' : ''}${name}</div><div class="rsub">${desc}</div>${done ? '' : '<div class="bar"><i></i></div>'}</div>
       <div class="rew"></div></div>`;
   }
   p.innerHTML = html + '</div>';
@@ -1908,7 +1841,7 @@ function buildAchievements() {
 function updateAchievements() {
   for (const r of UI.refs.ach || []) {
     const done = !!S.achievements[r.a.id];
-    setText(r.rew, done ? '🏆' : t('achReward', { x: fmt(achReward(r.a)) }));
+    setHTML(r.rew, done ? starImg() : t('achReward', { x: fmt(achReward(r.a)) }));
     if (r.bar) {
       const pct = Math.min(100, achStat(r.a.type) / r.a.n * 100);
       const w = pct.toFixed(1) + '%';
@@ -1940,13 +1873,13 @@ function refreshPanel(force) {
 
   // Кнопки зала
   const rush = $('#rushBtn');
-  if (S.rushLeft > 0) { setText(rush, t('rushActive', { t: fmtClock(S.rushLeft) })); rush.disabled = true; rush.classList.add('active'); }
-  else { setText(rush, t('rushBtn')); rush.disabled = SDK.adActive; rush.classList.remove('active'); }
+  if (S.rushLeft > 0) { setHTML(rush, t('rushActive', { t: fmtClock(S.rushLeft) })); rush.disabled = true; rush.classList.add('active'); }
+  else { setHTML(rush, t('rushBtn')); rush.disabled = SDK.adActive; rush.classList.remove('active'); }
   const gb = $('#guestBtn');
   const wait = (S.guestCallAt - Date.now()) / 1000;
-  if (guest) { setText(gb, t('guestHereBtn')); gb.disabled = true; }
-  else if (wait > 0) { setText(gb, t('guestWait', { t: fmtClock(wait) })); gb.disabled = true; }
-  else { setText(gb, t('guestBtn')); gb.disabled = SDK.adActive; }
+  if (guest) { setHTML(gb, t('guestHereBtn')); gb.disabled = true; }
+  else if (wait > 0) { setHTML(gb, t('guestWait', { t: fmtClock(wait) })); gb.disabled = true; }
+  else { setHTML(gb, t('guestBtn')); gb.disabled = SDK.adActive; }
 
   // Индикаторы бустов
   let bh = '';
@@ -1956,7 +1889,7 @@ function refreshPanel(force) {
   // Звёзды в шапке
   setText($('#stars'), String(S.stars));
   $('#starsChip').classList.toggle('glow', pendingStars() >= 1);
-  setText($('#soundBtn'), S.muted ? '🔇' : '🔊');
+  setHTML($('#soundBtn'), S.muted ? SVG.soundOff : SVG.soundOn);
 }
 
 function renderTop() {
@@ -2089,15 +2022,35 @@ function bindEvents() {
 /* =====================================================================
    ЗАПУСК
    ===================================================================== */
+// Все картинки игры (для предзагрузки до LoadingAPI.ready)
+function allImages() {
+  const set = new Set([CONFIG.coinIcon, CONFIG.starIcon, CONFIG.machine.icon]);
+  const add = v => { if (typeof v === 'string' && /\.(png|jpe?g|gif|svg|webp)$/i.test(v)) set.add(v); };
+  Object.values(CONFIG.ui).forEach(add);
+  [CONFIG.workers, CONFIG.upgrades, CONFIG.guests.list, CONFIG.achievements].forEach(list => list.forEach(x => add(x.icon)));
+  CONFIG.cities.forEach(c => add(c.bg));
+  return [...set];
+}
+function preloadImages(urls, timeoutMs) {
+  const one = url => new Promise(res => {
+    const img = new Image();
+    img.onload = img.onerror = () => res();
+    img.src = url;
+  });
+  return Promise.race([Promise.all(urls.map(one)), new Promise(res => setTimeout(res, timeoutMs))]);
+}
+
 async function boot() {
+  const preload = preloadImages(allImages(), 8000);
   await SDK.init();
   document.documentElement.lang = LANG;
   document.title = t('title');
   document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
   $('#coinIco').innerHTML = iconPart(CONFIG.coinIcon, 'emo');
   $('#starIco').innerHTML = iconPart(CONFIG.starIcon, 'emo');
+  document.querySelectorAll('[data-icon]').forEach(el => { el.innerHTML = iconPart(CONFIG.ui[el.dataset.icon], 'emo'); });
 
-  const saved = await SDK.load();
+  const [saved] = await Promise.all([SDK.load(), preload]);
   S = normalizeState(saved);
   recalc();
 
@@ -2111,7 +2064,7 @@ async function boot() {
   switchTab(['cats', 'upgrades', 'collection', 'achievements'].includes(startTab) ? startTab : 'cats');
   renderTop();
 
-  if (location.search.includes('debug')) window.CatCafe = { get S() { return S; }, recalc, spawnGuest, earn, saveGame, doPrestige };
+  if (location.search.includes('debug')) window.CatCafe = { get S() { return S; }, recalc, spawnGuest, earn, saveGame, doPrestige, applyCity };
 
   Game.started = true;
   lastFrame = performance.now();
